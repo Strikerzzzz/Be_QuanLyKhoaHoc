@@ -14,6 +14,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigin",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:4200")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
 // Thêm dịch vụ Identity
 builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
@@ -68,6 +78,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
 
 var app = builder.Build();
+app.UseCors("AllowSpecificOrigin");
 
 //using (var scope = app.Services.CreateScope())
 //{
@@ -76,6 +87,7 @@ var app = builder.Build();
 //}
 
 // Configure the HTTP request pipeline.
+
 app.UseRouting();
 if (app.Environment.IsDevelopment())
 {

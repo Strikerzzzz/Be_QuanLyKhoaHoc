@@ -32,6 +32,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // POST: /users/register
         [HttpPost("register")]
         [AllowAnonymous]
+        [ProducesResponseType(typeof(Result<string>), 200)] // Success
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (!ModelState.IsValid)
@@ -52,6 +54,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // POST: /users/login
         [HttpPost("login")]
         [AllowAnonymous]
+        [ProducesResponseType(typeof(Result<string>), 200)] // Success
+        [ProducesResponseType(typeof(object), 401)] // Unauthorized
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (!ModelState.IsValid)
@@ -72,6 +76,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // API: Get all users
         [HttpGet]
+        [ProducesResponseType(typeof(Result<IEnumerable<User>>), 200)]
+        [ProducesResponseType(typeof(object), 401)]
         public async Task<IActionResult> GetUsers()
         {
             var users = await _context.Users.ToListAsync();
