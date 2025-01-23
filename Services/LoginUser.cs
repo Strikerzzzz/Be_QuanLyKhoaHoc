@@ -42,7 +42,7 @@ namespace Be_QuanLyKhoaHoc.Services
                 throw new Exception("The password is incorrect");
             }
 
-            string token = _tokenProvider.Create(user);
+            string token = await _tokenProvider.Create(user);
 
             return token;
         }

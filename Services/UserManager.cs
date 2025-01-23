@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Be_QuanLyKhoaHoc.Services
 {
+    //lớp này bỏ đây cho biết có cái gì thôi chứ không có tác dụng gì hết bên khác dùng tới đâu gọi tới ở đấy hết rồi
     public class UserManager
     {
         private readonly UserManager<User> _userManager;

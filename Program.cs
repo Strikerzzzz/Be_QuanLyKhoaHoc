@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,7 +46,7 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGenWithAuth();
 
-builder.Services.AddSingleton<TokenProvider>();
+builder.Services.AddScoped<TokenProvider>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<LoginUser>();
 
@@ -53,7 +54,9 @@ builder.Services.AddAuthorization(options =>
 {
     options.DefaultPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
         .RequireAuthenticatedUser()
+        .RequireRole("Admin", "Lecturer", "User")
         .Build();
+
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -71,20 +74,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"] ?? string.Empty)),
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
+            RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.Zero
         };
     });
 
-Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
-
 var app = builder.Build();
 app.UseCors("AllowSpecificOrigin");
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-//    await RoleSeeder.SeedRolesAsync(roleManager);
-//}
 
 // Configure the HTTP request pipeline.
 

@@ -11,7 +11,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class UsersController : ControllerBase
     {
         private readonly UserManager<User> _userManager;
@@ -75,9 +74,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
 
         // API: Get all users
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
         [HttpGet]
         [ProducesResponseType(typeof(Result<IEnumerable<User>>), 200)]
         [ProducesResponseType(typeof(object), 401)]
+        [ProducesResponseType(typeof(object), 403)]
         public async Task<IActionResult> GetUsers()
         {
             var users = await _context.Users.ToListAsync();
