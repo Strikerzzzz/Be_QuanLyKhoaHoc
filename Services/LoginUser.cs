@@ -23,7 +23,7 @@ namespace Be_QuanLyKhoaHoc.Services
 
         public async Task<string> Handle(Request request)
         {
-            User? user = await _context.Users.GetByEmail(request.Email);
+            User? user = await _context.Users.GetByEmailAsync(request.Email);
 
             if (user is null || !user.EmailConfirmed)
             {
