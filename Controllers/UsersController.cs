@@ -3,9 +3,12 @@ using Be_QuanLyKhoaHoc.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Be_QuanLyKhoaHoc.Services;
 using Microsoft.AspNetCore.Authorization;
 using SampleProject.Common;
+using Be_QuanLyKhoaHoc.Services;
+using Be_QuanLyKhoaHoc.Services.Interfaces;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using System.Net;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -17,18 +20,23 @@ namespace Be_QuanLyKhoaHoc.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserService _userService;
         private readonly LoginUser _loginUser;
-        public UsersController(UserManager<User> userManager, ApplicationDbContext context, UserService userService, LoginUser loginUser)
+        private readonly IAppEmailSender _emailSender;
+        public UsersController(UserManager<User> userManager, ApplicationDbContext context,
+            UserService userService, LoginUser loginUser, IAppEmailSender emailSender)
         {
             _userManager = userManager;
             _context = context;
             _userService = userService;
             _loginUser = loginUser;
+            _emailSender = emailSender;
         }
         // DTOs for requests
         public record RegisterRequest(string Username, string Email, string Password);
         public record LoginRequest(string Email, string Password);
         public record AssignRoleRequest(string Email, string Role);
         public record RemoveRoleRequest(string Email, string Role);
+        public record ConfirmEmailRequest(string Email, string Token);
+
         // POST: /users/register
         [HttpPost("register")]
         [AllowAnonymous]
@@ -48,15 +56,58 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
                 if (result.Succeeded)
                 {
-                    return Ok(Result<string>.Success("User registered successfully."));
-                }
+                    var user = await _userManager.FindByEmailAsync(request.Email);
+                    if (user != null)
+                    {
+                        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var encodedToken = WebUtility.UrlEncode(token);
+                        var confirmationLink = $"http://localhost:4200/email-confirmation?email={request.Email}&token={encodedToken}";
 
+                        await _emailSender.SendEmailAsync(request.Email, "Confirm your email",
+                            $"Please confirm your email by clicking the link: <a href=\"{confirmationLink}\">Confirm Email</a>");
+                    }
+                    return Ok(Result<string>.Success("User registered successfully. A confirmation email has been sent."));
+                }
                 return BadRequest(Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<object>.Failure(new[] { "An unexpected error occurred.", ex.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
+        }
+
+        // POST: /users/confirm-email
+        [HttpPost("confirm-email")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(Result<string>), 200)] // Success
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(object), 404)] // Not Found
+        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Token))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Invalid email or token." }));
+            }
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                return NotFound(Result<object>.Failure(new[] { "User not found." }));
+            }
+            if (await _userManager.IsEmailConfirmedAsync(user))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Email is already confirmed." }));
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, request.Token);
+            if (result.Succeeded)
+            {
+                return Ok(Result<string>.Success("Email confirmed successfully."));
+            }
+
+            return BadRequest(Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
+
         }
 
         // POST: /users/login
@@ -79,7 +130,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<object>.Failure(new[] { "An unexpected error occurred.", ex.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
 
@@ -104,11 +155,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
             catch (DbUpdateException dbEx)
             {
-                return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { "Database error occurred.", dbEx.Message }));
+                return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { dbEx.Message }));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { "An unexpected error occurred.", ex.Message }));
+                return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { ex.Message }));
             }
         }
 
@@ -145,7 +196,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<object>.Failure(new[] { "An unexpected error occurred.", ex.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
 
@@ -182,7 +233,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<object>.Failure(new[] { "An unexpected error occurred.", ex.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
 
@@ -214,7 +265,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<object>.Failure(new[] { "An unexpected error occurred.", ex.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
     }

@@ -2,6 +2,7 @@
 using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Identity.Entities;
 using Be_QuanLyKhoaHoc.Services;
+using Be_QuanLyKhoaHoc.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -33,6 +34,10 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.Password.RequiredLength = 8;
+
+    options.SignIn.RequireConfirmedEmail = true;
+
+    options.User.RequireUniqueEmail = true;
 })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -49,6 +54,7 @@ builder.Services.AddSwaggerGenWithAuth();
 builder.Services.AddScoped<TokenProvider>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<LoginUser>();
+builder.Services.AddScoped<IAppEmailSender, AppEmailSender>();
 
 builder.Services.AddAuthorization(options =>
 {
