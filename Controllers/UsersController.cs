@@ -162,6 +162,39 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { ex.Message }));
             }
         }
+        // DELETE: /users/{id}
+        [HttpDelete("{id}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
+        [ProducesResponseType(typeof(Result<string>), 200)] // Success
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(object), 401)] // Unauthorized
+        [ProducesResponseType(typeof(object), 403)] // Forbidden
+        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        public async Task<IActionResult> DeleteUsers(string id)
+        {
+            try
+            {
+                // Sử dụng ExecuteDeleteAsync để xoá user (thao tác trên query)
+                var result = await _context.Users.Where(x => x.Id == id).ExecuteDeleteAsync();
+
+                if (result > 0)
+                {
+                    return Ok(Result<string>.Success("User deleted successfully."));
+                }
+                else
+                {
+                    return StatusCode(500, Result<object>.Failure(new[] { "Delete operation failed." }));
+                }
+            }
+            catch (DbUpdateException dbEx)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { dbEx.Message }));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
+            }
+        }
 
         // POST: /users/assign-role
         [HttpPost("assign-role")]
@@ -266,6 +299,78 @@ namespace Be_QuanLyKhoaHoc.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
+            }
+        }
+
+        // POST: /users/lock
+        [HttpPost("lock")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
+        [ProducesResponseType(typeof(Result<string>), 200)] // Success
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(object), 401)] // Unauthorized
+        [ProducesResponseType(typeof(object), 403)] // Forbidden
+        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        public async Task<IActionResult> LockUser([FromQuery] string id, [FromQuery] int minutes)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "User id is required." }));
+            }
+            if (minutes <= 0)
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Lock duration (minutes) must be greater than 0." }));
+            }
+
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound(Result<object>.Failure(new[] { "User not found." }));
+            }
+
+            // Tính toán thời gian kết thúc khóa dựa trên thời gian hiện tại (UTC)
+            DateTimeOffset lockoutEnd = DateTimeOffset.UtcNow.AddMinutes(minutes);
+            var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
+
+            if (result.Succeeded)
+            {
+                return Ok(Result<string>.Success($"User locked until {lockoutEnd.LocalDateTime:yyyy-MM-dd HH:mm:ss}"));
+            }
+            else
+            {
+                return StatusCode(500, Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
+            }
+        }
+
+        // POST: /users/unlock
+        [HttpPost("unlock")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
+        [ProducesResponseType(typeof(Result<string>), 200)] // Success
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(object), 401)] // Unauthorized
+        [ProducesResponseType(typeof(object), 403)] // Forbidden
+        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        public async Task<IActionResult> UnlockUser([FromQuery] string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "User id is required." }));
+            }
+
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound(Result<object>.Failure(new[] { "User not found." }));
+            }
+
+            // Đặt LockoutEnd = null sẽ mở khóa tài khoản
+            var result = await _userManager.SetLockoutEndDateAsync(user, null);
+            if (result.Succeeded)
+            {
+                return Ok(Result<string>.Success("User unlocked successfully."));
+            }
+            else
+            {
+                return StatusCode(500, Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
             }
         }
     }

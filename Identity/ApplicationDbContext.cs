@@ -28,7 +28,7 @@ namespace Be_QuanLyKhoaHoc.Identity
             var adminUser = new User
             {
                 Id = adminUserId,
-                UserName = "admin@ntt.com",
+                UserName = "admin",
                 Email = "admin@ntt.com",
                 FullName = "Admin",
                 NormalizedUserName = "ADMIN@NTT.COM",

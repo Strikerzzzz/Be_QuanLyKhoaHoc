@@ -17,7 +17,8 @@ namespace Be_QuanLyKhoaHoc.Services
             var user = new User
             {
                 UserName = username,
-                Email = email
+                Email = email,
+                LockoutEnabled = true
             };
 
             var result = await _userManager.CreateAsync(user, password);
