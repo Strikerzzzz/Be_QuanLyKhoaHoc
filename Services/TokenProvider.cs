@@ -27,7 +27,7 @@ namespace Be_QuanLyKhoaHoc.Services
 
             if (string.IsNullOrEmpty(secretKey))
             {
-                throw new InvalidOperationException("JWT secret key is not configured.");
+                throw new InvalidOperationException("Khóa bí mật JWT chưa được cấu hình.");
             }
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));

@@ -9,14 +9,14 @@ namespace Be_QuanLyKhoaHoc.Extensions
         {
             if (string.IsNullOrEmpty(email))
             {
-                throw new ArgumentException("Email must not be empty.", nameof(email));
+                throw new ArgumentException("Email không được để trống.", nameof(email));
             }
 
             var user = await users.FirstOrDefaultAsync(u => u.Email == email);
 
             if (user == null)
             {
-                throw new InvalidOperationException($"No user found with the email: {email}");
+                throw new InvalidOperationException($"Không tìm thấy người dùng với email: {email}");
             }
 
             return user;

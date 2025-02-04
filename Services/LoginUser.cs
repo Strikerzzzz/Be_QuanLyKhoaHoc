@@ -29,17 +29,18 @@ namespace Be_QuanLyKhoaHoc.Services
 
             if (user is null || !user.EmailConfirmed)
             {
-                throw new Exception("The user was not found or email is not confirmed.");
+                throw new Exception("Không tìm thấy người dùng hoặc email chưa được xác nhận.");
             }
 
             if (await _userManager.IsLockedOutAsync(user))
             {
-                throw new Exception($"Your account is locked until {user.LockoutEnd?.ToLocalTime():yyyy-MM-dd HH:mm:ss}.");
+                throw new Exception($"Tài khoản của bạn đã bị khóa đến {TimeZoneInfo.ConvertTimeFromUtc(user.LockoutEnd.Value.UtcDateTime, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")):yyyy-MM-dd HH:mm:ss}.");
+
             }
 
             if (string.IsNullOrEmpty(user.PasswordHash))
             {
-                throw new Exception("Password hash is missing for the user.");
+                throw new Exception("Thiếu mật khẩu đã mã hóa cho người dùng.");
             }
 
             var verified = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
@@ -55,10 +56,10 @@ namespace Be_QuanLyKhoaHoc.Services
                         await _userManager.SetLockoutEnabledAsync(user, true);
                     }
 
-                    throw new Exception($"Too many failed attempts. Your account has been locked until {user.LockoutEnd?.ToLocalTime():yyyy-MM-dd HH:mm:ss}.");
+                    throw new Exception($"Quá nhiều lần đăng nhập thất bại. Tài khoản của bạn đã bị khóa đến {TimeZoneInfo.ConvertTimeFromUtc(user.LockoutEnd.Value.UtcDateTime, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")):yyyy-MM-dd HH:mm:ss}.");
                 }
 
-                throw new Exception("The password is incorrect.");
+                throw new Exception("Mật khẩu không đúng.");
             }
 
             await _userManager.ResetAccessFailedCountAsync(user);

@@ -24,16 +24,5 @@ namespace SampleProject.Common
 
         public static Result<T> Failure(IEnumerable<string> errors)
             => new Result<T>(false, errors ?? Array.Empty<string>(), default(T));
-
-        public bool HasErrors() => Errors.Count > 0;
-
-        public bool HasData() => Data != null;
-
-        public string GetErrorMessage()
-            => Errors.Count > 0 ? string.Join("; ", Errors) : "No errors found.";
-
-        public bool IsSuccess() => Succeeded;
-
-        public bool IsFailure() => !Succeeded;
     }
 }

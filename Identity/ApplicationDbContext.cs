@@ -34,6 +34,7 @@ namespace Be_QuanLyKhoaHoc.Identity
                 NormalizedUserName = "ADMIN@NTT.COM",
                 NormalizedEmail = "ADMIN@NTT.COM",
                 EmailConfirmed = true,
+                LockoutEnabled = true,
                 SecurityStamp = Guid.NewGuid().ToString()
             };
             var passwordHasher = new PasswordHasher<User>();

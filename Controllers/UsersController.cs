@@ -63,10 +63,10 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         var encodedToken = WebUtility.UrlEncode(token);
                         var confirmationLink = $"http://localhost:4200/email-confirmation?email={request.Email}&token={encodedToken}";
 
-                        await _emailSender.SendEmailAsync(request.Email, "Confirm your email",
-                            $"Please confirm your email by clicking the link: <a href=\"{confirmationLink}\">Confirm Email</a>");
+                        await _emailSender.SendEmailAsync(request.Email, "Xác nhận email",
+                         $"Vui lòng xác nhận email của bạn bằng cách nhấp vào liên kết: <a href=\"{confirmationLink}\">Xác nhận email</a>");
                     }
-                    return Ok(Result<string>.Success("User registered successfully. A confirmation email has been sent."));
+                    return Ok(Result<string>.Success("Người dùng đã được đăng ký thành công. Một email xác nhận đã được gửi."));
                 }
                 return BadRequest(Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
             }
@@ -87,23 +87,23 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Token))
             {
-                return BadRequest(Result<object>.Failure(new[] { "Invalid email or token." }));
+                return BadRequest(Result<object>.Failure(new[] { "Email hoặc mã xác nhận không hợp lệ." }));
             }
 
             var user = await _userManager.FindByEmailAsync(request.Email);
             if (user == null)
             {
-                return NotFound(Result<object>.Failure(new[] { "User not found." }));
+                return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
             }
             if (await _userManager.IsEmailConfirmedAsync(user))
             {
-                return BadRequest(Result<object>.Failure(new[] { "Email is already confirmed." }));
+                return BadRequest(Result<object>.Failure(new[] { "Email đã được xác nhận." }));
             }
 
             var result = await _userManager.ConfirmEmailAsync(user, request.Token);
             if (result.Succeeded)
             {
-                return Ok(Result<string>.Success("Email confirmed successfully."));
+                return Ok(Result<string>.Success("Email đã được xác nhận thành công."));
             }
 
             return BadRequest(Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
@@ -149,7 +149,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var users = await _context.Users.ToListAsync();
                 if (users == null || !users.Any())
                 {
-                    return NotFound(Result<IEnumerable<User>>.Failure(new[] { "No users found." }));
+                    return NotFound(Result<IEnumerable<User>>.Failure(new[] { "Không tìm thấy người dùng." }));
                 }
                 return Ok(Result<IEnumerable<User>>.Success(users));
             }
@@ -179,11 +179,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
                 if (result > 0)
                 {
-                    return Ok(Result<string>.Success("User deleted successfully."));
+                    return Ok(Result<string>.Success("Người dùng đã được xóa thành công."));
                 }
                 else
                 {
-                    return StatusCode(500, Result<object>.Failure(new[] { "Delete operation failed." }));
+                    return StatusCode(500, Result<object>.Failure(new[] { "Thao tác xóa thất bại." }));
                 }
             }
             catch (DbUpdateException dbEx)
@@ -216,13 +216,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var user = await _userManager.FindByEmailAsync(request.Email);
                 if (user == null)
                 {
-                    return NotFound(Result<object>.Failure(new[] { $"No user found with the email: {request.Email}" }));
+                    return NotFound(Result<object>.Failure(new[] { $"Không tìm thấy người dùng với email: {request.Email}" }));
                 }
 
                 var result = await _userManager.AddToRoleAsync(user, request.Role);
                 if (result.Succeeded)
                 {
-                    return Ok(Result<string>.Success($"Role '{request.Role}' has been assigned to user {request.Email} successfully."));
+                    return Ok(Result<string>.Success($"Vai trò '{request.Role}' đã được gán cho người dùng {request.Email} thành công."));
                 }
 
                 return BadRequest(Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
@@ -253,13 +253,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var user = await _userManager.FindByEmailAsync(request.Email);
                 if (user == null)
                 {
-                    return NotFound(Result<object>.Failure(new[] { $"No user found with the email: {request.Email}" }));
+                    return NotFound(Result<object>.Failure(new[] { $"Không tìm thấy người dùng với email: {request.Email}" }));
                 }
 
                 var result = await _userManager.RemoveFromRoleAsync(user, request.Role);
                 if (result.Succeeded)
                 {
-                    return Ok(Result<string>.Success($"Role '{request.Role}' has been removed from user {request.Email} successfully."));
+                    return Ok(Result<string>.Success($"Vai trò '{request.Role}' đã được xóa khỏi người dùng {request.Email} thành công."));
                 }
 
                 return BadRequest(Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
@@ -282,7 +282,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             if (string.IsNullOrEmpty(email))
             {
-                return BadRequest(Result<object>.Failure(new[] { "Email is required." }));
+                return BadRequest(Result<object>.Failure(new[] { "Email là bắt buộc." }));
             }
 
             try
@@ -290,7 +290,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var user = await _userManager.FindByEmailAsync(email);
                 if (user == null)
                 {
-                    return NotFound(Result<object>.Failure(new[] { $"No user found with the email: {email}" }));
+                    return NotFound(Result<object>.Failure(new[] { $"Không tìm thấy người dùng với email: {email}" }));
                 }
 
                 var roles = await _userManager.GetRolesAsync(user);
@@ -314,17 +314,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             if (string.IsNullOrEmpty(id))
             {
-                return BadRequest(Result<object>.Failure(new[] { "User id is required." }));
+                return BadRequest(Result<object>.Failure(new[] { "Id người dùng là bắt buộc." }));
             }
             if (minutes <= 0)
             {
-                return BadRequest(Result<object>.Failure(new[] { "Lock duration (minutes) must be greater than 0." }));
+                return BadRequest(Result<object>.Failure(new[] { "Thời gian khóa (phút) phải lớn hơn 0." }));
             }
 
             var user = await _userManager.FindByIdAsync(id);
             if (user == null)
             {
-                return NotFound(Result<object>.Failure(new[] { "User not found." }));
+                return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
             }
 
             // Tính toán thời gian kết thúc khóa dựa trên thời gian hiện tại (UTC)
@@ -333,7 +333,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             if (result.Succeeded)
             {
-                return Ok(Result<string>.Success($"User locked until {lockoutEnd.LocalDateTime:yyyy-MM-dd HH:mm:ss}"));
+                return Ok(Result<string>.Success($"Người dùng bị khóa cho đến {lockoutEnd.ToOffset(TimeSpan.FromHours(7)).LocalDateTime:yyyy-MM-dd HH:mm:ss}"));
+
             }
             else
             {
@@ -353,20 +354,20 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             if (string.IsNullOrEmpty(id))
             {
-                return BadRequest(Result<object>.Failure(new[] { "User id is required." }));
+                return BadRequest(Result<object>.Failure(new[] { "Id người dùng là bắt buộc." }));
             }
 
             var user = await _userManager.FindByIdAsync(id);
             if (user == null)
             {
-                return NotFound(Result<object>.Failure(new[] { "User not found." }));
+                return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
             }
 
             // Đặt LockoutEnd = null sẽ mở khóa tài khoản
             var result = await _userManager.SetLockoutEndDateAsync(user, null);
             if (result.Succeeded)
             {
-                return Ok(Result<string>.Success("User unlocked successfully."));
+                return Ok(Result<string>.Success("Người dùng đã được mở khóa thành công."));
             }
             else
             {
