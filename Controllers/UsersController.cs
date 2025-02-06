@@ -135,7 +135,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
 
         // API: Get all users
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
         [HttpGet]
         [ProducesResponseType(typeof(Result<IEnumerable<User>>), 200)]
         [ProducesResponseType(typeof(object), 400)]
