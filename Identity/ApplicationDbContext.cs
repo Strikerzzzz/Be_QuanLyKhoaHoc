@@ -20,7 +20,6 @@ namespace Be_QuanLyKhoaHoc.Identity
         public DbSet<Question> Questions { get; set; }
         public DbSet<MultipleChoiceQuestion> MultipleChoiceQuestions { get; set; }
         public DbSet<FillInBlankQuestion> FillInBlankQuestions { get; set; }
-        public DbSet<Answer> Answers { get; set; }
         public DbSet<Progress> Progresses { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -81,50 +80,6 @@ namespace Be_QuanLyKhoaHoc.Identity
                 t.HasCheckConstraint("CK_MultipleChoiceQuestion_CorrectIndex", "[CorrectAnswerIndex] >= 0");
             });
 
-            #region Cấu hình quan hệ giữa các bảng
-
-            builder.Entity<Lesson>()
-                   .HasMany(l => l.LessonContents)
-                   .WithOne(lc => lc.Lesson)
-                   .HasForeignKey(lc => lc.LessonId)
-                   .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<Course>()
-                   .HasMany(c => c.Lessons)
-                   .WithOne(l => l.Course)
-                   .HasForeignKey(l => l.CourseId)
-                   .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<Course>()
-                   .HasMany(c => c.Exams)
-                   .WithOne(e => e.Course)
-                   .HasForeignKey(e => e.CourseId)
-                   .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<Lesson>()
-                   .HasMany(l => l.Assignments)
-                   .WithOne(a => a.Lesson)
-                   .HasForeignKey(a => a.LessonId)
-                   .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<Progress>()
-                   .HasOne(p => p.Student)
-                   .WithMany()
-                   .HasForeignKey(p => p.StudentId)
-                   .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<ExamResult>()
-                   .HasOne(e => e.Student)
-                   .WithMany()
-                   .HasForeignKey(e => e.StudentId)
-                   .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<ExamResult>()
-                    .HasOne(e => e.Exam)
-                    .WithMany()
-                    .HasForeignKey(e => e.ExamId)
-                    .OnDelete(DeleteBehavior.Restrict);
-            #endregion
         }
     }
 }

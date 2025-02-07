@@ -42,7 +42,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [AllowAnonymous]
         [ProducesResponseType(typeof(Result<string>), 200)] // Success
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
-        [ProducesResponseType(typeof(object), 500)]  // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 500)]  // Internal server error
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (!ModelState.IsValid)
@@ -81,7 +81,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [AllowAnonymous]
         [ProducesResponseType(typeof(Result<string>), 200)] // Success
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
-        [ProducesResponseType(typeof(object), 404)] // Not Found
+        [ProducesResponseType(typeof(Result<object>), 404)] // Not Found
         [ProducesResponseType(typeof(object), 500)] // Internal server error
         public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request)
         {
@@ -114,8 +114,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [HttpPost("login")]
         [AllowAnonymous]
         [ProducesResponseType(typeof(Result<string>), 200)] // Success
-        [ProducesResponseType(typeof(object), 400)] // Validation failure
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (!ModelState.IsValid)
@@ -141,7 +141,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(object), 400)]
         [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(object), 403)]
-        [ProducesResponseType(typeof(object), 500)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> GetUsers()
         {
             try
@@ -149,27 +150,27 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var users = await _context.Users.ToListAsync();
                 if (users == null || !users.Any())
                 {
-                    return NotFound(Result<IEnumerable<User>>.Failure(new[] { "Không tìm thấy người dùng." }));
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
                 }
                 return Ok(Result<IEnumerable<User>>.Success(users));
             }
             catch (DbUpdateException dbEx)
             {
-                return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { dbEx.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { dbEx.Message }));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<IEnumerable<User>>.Failure(new[] { ex.Message }));
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
         // DELETE: /users/{id}
         [HttpDelete("{id}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
         [ProducesResponseType(typeof(Result<string>), 200)] // Success
-        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(object), 400)] // Validation failure
         [ProducesResponseType(typeof(object), 401)] // Unauthorized
         [ProducesResponseType(typeof(object), 403)] // Forbidden
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> DeleteUsers(string id)
         {
             try
@@ -202,8 +203,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<string>), 200)] // Success
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
         [ProducesResponseType(typeof(object), 401)] // Unauthorized
-        [ProducesResponseType(typeof(object), 403)] // Forbidden
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(object), 403)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> AssignRole([FromBody] AssignRoleRequest request)
         {
             if (!ModelState.IsValid)
@@ -240,7 +242,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
         [ProducesResponseType(typeof(object), 401)] // Unauthorized
         [ProducesResponseType(typeof(object), 403)] // Forbidden
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> RemoveRole([FromBody] RemoveRoleRequest request)
         {
             if (!ModelState.IsValid)
@@ -277,7 +280,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
         [ProducesResponseType(typeof(object), 401)] // Unauthorized
         [ProducesResponseType(typeof(object), 403)] // Forbidden
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> GetUserRoles(string email)
         {
             if (string.IsNullOrEmpty(email))
@@ -309,7 +313,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
         [ProducesResponseType(typeof(object), 401)] // Unauthorized
         [ProducesResponseType(typeof(object), 403)] // Forbidden
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> LockUser([FromQuery] string id, [FromQuery] int minutes)
         {
             if (string.IsNullOrEmpty(id))
@@ -349,7 +354,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
         [ProducesResponseType(typeof(object), 401)] // Unauthorized
         [ProducesResponseType(typeof(object), 403)] // Forbidden
-        [ProducesResponseType(typeof(object), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> UnlockUser([FromQuery] string id)
         {
             if (string.IsNullOrEmpty(id))
