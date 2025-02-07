@@ -24,7 +24,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // GET: api/Courses
         [HttpGet]
         [ProducesResponseType(typeof(Result<IEnumerable<Course>>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 401)]
+        [ProducesResponseType(typeof(object), 403)] // Forbidden
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> GetCourses()
         {
@@ -52,7 +53,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(Result<Course>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(Result<object>), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> GetCourse(int id)
@@ -92,7 +93,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [HttpPost]
         [ProducesResponseType(typeof(Result<Course>), 201)]
         [ProducesResponseType(typeof(Result<object>), 400)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> CreateCourse([FromBody] CreateCourseRequest request)
         {
@@ -136,7 +137,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 404)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(Result<object>), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseRequest request)
@@ -189,7 +190,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(Result<object>), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> DeleteCourse(int id)
