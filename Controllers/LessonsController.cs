@@ -26,6 +26,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<IEnumerable<Lesson>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
+
         public async Task<IActionResult> GetLessonsByCourse(int courseId)
         {
            
@@ -37,12 +38,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
                 }
 
-               //lấy mỗi courseid và title
+                // Chỉ lấy CourseId và Title
                 var lessons = await _context.Lessons
                     .Where(l => l.CourseId == courseId)
+                    .Select(l => new
+                    {
+                        l.CourseId,
+                        l.Title
+                    })
                     .ToListAsync();
 
-                return Ok(Result<IEnumerable<Lesson>>.Success(lessons));
+                return Ok(Result<IEnumerable<object>>.Success(lessons));
             }
             catch (Exception ex)
             {
