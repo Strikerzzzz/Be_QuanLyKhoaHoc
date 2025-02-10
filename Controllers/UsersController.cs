@@ -21,14 +21,16 @@ namespace Be_QuanLyKhoaHoc.Controllers
         private readonly UserService _userService;
         private readonly LoginUser _loginUser;
         private readonly IAppEmailSender _emailSender;
+        private readonly IConfiguration _configuration;
         public UsersController(UserManager<User> userManager, ApplicationDbContext context,
-            UserService userService, LoginUser loginUser, IAppEmailSender emailSender)
+            UserService userService, LoginUser loginUser, IAppEmailSender emailSender, IConfiguration configuration)
         {
             _userManager = userManager;
             _context = context;
             _userService = userService;
             _loginUser = loginUser;
             _emailSender = emailSender;
+            _configuration = configuration;
         }
         // DTOs for requests
         public record RegisterRequest(string Username, string Email, string Password);
@@ -61,10 +63,15 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     {
                         var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                         var encodedToken = WebUtility.UrlEncode(token);
-                        var confirmationLink = $"http://localhost:4200/email-confirmation?email={request.Email}&token={encodedToken}";
 
-                        await _emailSender.SendEmailAsync(request.Email, "Xác nhận email",
-                         $"Vui lòng xác nhận email của bạn bằng cách nhấp vào liên kết: <a href=\"{confirmationLink}\">Xác nhận email</a>");
+                        var confirmationBaseUrl = _configuration["EmailSettings:ConfirmationUrl"];
+                        var confirmationLink = $"{confirmationBaseUrl}?email={request.Email}&token={encodedToken}";
+
+                        await _emailSender.SendEmailAsync(
+                            request.Email,
+                            "Xác nhận email",
+                            $"Vui lòng xác nhận email của bạn bằng cách nhấp vào liên kết: <a href=\"{confirmationLink}\">Xác nhận email</a>"
+                        );
                     }
                     return Ok(Result<string>.Success("Người dùng đã được đăng ký thành công. Một email xác nhận đã được gửi."));
                 }
@@ -163,6 +170,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
+
         // DELETE: /users/{id}
         [HttpDelete("{id}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
@@ -284,11 +292,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
         public async Task<IActionResult> GetUserRoles(string email)
         {
-            if (string.IsNullOrEmpty(email))
-            {
-                return BadRequest(Result<object>.Failure(new[] { "Email là bắt buộc." }));
-            }
-
             try
             {
                 var user = await _userManager.FindByEmailAsync(email);
@@ -309,12 +312,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // POST: /users/lock
         [HttpPost("lock")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
-        [ProducesResponseType(typeof(Result<string>), 200)] // Success
-        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
-        [ProducesResponseType(typeof(object), 401)] // Unauthorized
-        [ProducesResponseType(typeof(object), 403)] // Forbidden
+        [ProducesResponseType(typeof(Result<string>), 200)] 
+        [ProducesResponseType(typeof(Result<object>), 400)] 
+        [ProducesResponseType(typeof(object), 401)]
+        [ProducesResponseType(typeof(object), 403)]
         [ProducesResponseType(typeof(Result<object>), 404)]
-        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> LockUser([FromQuery] string id, [FromQuery] int minutes)
         {
             if (string.IsNullOrEmpty(id))
@@ -332,7 +335,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
             }
 
-            // Tính toán thời gian kết thúc khóa dựa trên thời gian hiện tại (UTC)
             DateTimeOffset lockoutEnd = DateTimeOffset.UtcNow.AddMinutes(minutes);
             var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
 
@@ -369,7 +371,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
             }
 
-            // Đặt LockoutEnd = null sẽ mở khóa tài khoản
             var result = await _userManager.SetLockoutEndDateAsync(user, null);
             if (result.Succeeded)
             {

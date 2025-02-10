@@ -29,7 +29,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         public async Task<IActionResult> GetLessonsByCourse(int courseId)
         {
-           
+
             try
             {
                 var course = await _context.Courses.FindAsync(courseId);
@@ -66,7 +66,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         public async Task<IActionResult> GetLesson(int id)
         {
-            
+
             try
             {
                 var lesson = await _context.Lessons
@@ -78,7 +78,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
                 }
 
-              
+
                 return Ok(Result<Lesson>.Success(lesson));
             }
             catch (Exception ex)
@@ -160,11 +160,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
                 }
 
-                if (lesson.Course.LecturerId != lecturerId)
-                {
-                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền chỉnh sửa bài học này." }));
-                }
-
                 lesson.Title = request.Title;
 
                 _context.Entry(lesson).State = EntityState.Modified;
@@ -199,11 +194,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 if (lesson == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
-                }
-
-                if (lesson.Course.LecturerId != lecturerId)
-                {
-                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xóa bài học này." }));
                 }
 
                 _context.Lessons.Remove(lesson);

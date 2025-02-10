@@ -7,13 +7,13 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
     {
         [Key]
         public int ResultId { get; set; }
-        public string? StudentId { get; set; } = string.Empty;
+        public string? StudentId { get; set; }
 
         [ForeignKey(nameof(StudentId))]
         public User? Student { get; set; }
 
         [Required]
-        public int ExamId { get; set; }
+        public int? ExamId { get; set; }
 
         [ForeignKey(nameof(ExamId))]
         public Exam? Exam { get; set; }

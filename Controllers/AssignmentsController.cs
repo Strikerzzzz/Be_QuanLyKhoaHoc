@@ -112,7 +112,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     Title = request.Title,
                     Description = request.Description,
-                    AssignmentType = request.AssignmentType,
                     LessonId = request.LessonId
                 };
 
@@ -160,7 +159,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
                 assignment.Title = request.Title;
                 assignment.Description = request.Description;
-                assignment.AssignmentType = request.AssignmentType;
 
                 _context.Entry(assignment).State = EntityState.Modified;
                 await _context.SaveChangesAsync();

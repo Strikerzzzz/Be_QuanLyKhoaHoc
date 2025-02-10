@@ -13,8 +13,6 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         [Required]
         [Range(0, int.MaxValue)]
         public int CorrectAnswerIndex { get; set; }
-        [MaxLength(50)]
-        public string Difficulty { get; set; } = "Normal";
         public MultipleChoiceQuestion()
         {
             Type = QuestionType.MultipleChoice;

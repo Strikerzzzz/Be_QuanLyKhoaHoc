@@ -20,14 +20,11 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         public string? Keywords { get; set; }
         public string? AvatarUrl { get; set; }
 
-        // Quan hệ với User là Giảng viên
         [Required]
-        public string LecturerId { get; set; } = string.Empty;
+        public string? LecturerId { get; set; } = string.Empty;
+
         [ForeignKey(nameof(LecturerId))]
         public User? Lecturer { get; set; }
 
-        // Danh sách bài học và kiểm tra
-        public ICollection<Lesson>? Lessons { get; set; }
-        public ICollection<Exam>? Exams { get; set; }
     }
 }

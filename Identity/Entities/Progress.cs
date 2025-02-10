@@ -7,15 +7,12 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
     {
         [Key]
         public int ProgressId { get; set; }
-
-        [Required]
         public string? StudentId { get; set; }
 
         [ForeignKey(nameof(StudentId))]
         public User? Student { get; set; }
 
-        [Required]
-        public int CourseId { get; set; }
+        public int? CourseId { get; set; }
 
         [ForeignKey(nameof(CourseId))]
         public Course? Course { get; set; }

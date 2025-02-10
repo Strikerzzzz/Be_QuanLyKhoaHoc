@@ -22,46 +22,6 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Answer", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("AssignmentId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ExamId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsCorrect")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("QuestionId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SourceValue")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UserAnswer")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("UserAnswerIndex")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssignmentId");
-
-                    b.HasIndex("ExamId");
-
-                    b.HasIndex("QuestionId");
-
-                    b.ToTable("Answers");
-                });
-
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", b =>
                 {
                     b.Property<int>("AssignmentId")
@@ -70,13 +30,10 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AssignmentId"));
 
-                    b.Property<string>("AssignmentType")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("LessonId")
+                    b.Property<int?>("LessonId")
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
@@ -86,7 +43,9 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     b.HasKey("AssignmentId");
 
-                    b.HasIndex("LessonId");
+                    b.HasIndex("LessonId")
+                        .IsUnique()
+                        .HasFilter("[LessonId] IS NOT NULL");
 
                     b.ToTable("Assignments");
                 });
@@ -99,14 +58,13 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ResultId"));
 
-                    b.Property<int>("AssignmentId")
+                    b.Property<int?>("AssignmentId")
                         .HasColumnType("int");
 
                     b.Property<float>("Score")
                         .HasColumnType("real");
 
                     b.Property<string>("StudentId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime?>("SubmissionTime")
@@ -118,10 +76,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("AssignmentResults", t =>
-                        {
-                            t.HasCheckConstraint("CK_AssignmentResult_Score", "[Score] BETWEEN 0 AND 100");
-                        });
+                    b.ToTable("AssignmentResults");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Course", b =>
@@ -161,10 +116,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     b.HasIndex("LecturerId");
 
-                    b.ToTable("Courses", t =>
-                        {
-                            t.HasCheckConstraint("CK_Course_Price", "[Price] >= 0");
-                        });
+                    b.ToTable("Courses");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Exam", b =>
@@ -175,7 +127,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ExamId"));
 
-                    b.Property<int>("CourseId")
+                    b.Property<int?>("CourseId")
+                        .IsRequired()
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
@@ -201,7 +154,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ResultId"));
 
-                    b.Property<int>("ExamId")
+                    b.Property<int?>("ExamId")
+                        .IsRequired()
                         .HasColumnType("int");
 
                     b.Property<float>("Score")
@@ -230,7 +184,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LessonId"));
 
-                    b.Property<int>("CourseId")
+                    b.Property<int?>("CourseId")
+                        .IsRequired()
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
@@ -256,7 +211,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     b.Property<string>("Content")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("LessonId")
+                    b.Property<int?>("LessonId")
+                        .IsRequired()
                         .HasColumnType("int");
 
                     b.Property<string>("MediaType")
@@ -288,14 +244,13 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     b.Property<float>("CompletionRate")
                         .HasColumnType("real");
 
-                    b.Property<int>("CourseId")
+                    b.Property<int?>("CourseId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("StudentId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<float>("TotalAssignmentScore")
@@ -313,12 +268,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("Progresses", t =>
-                        {
-                            t.HasCheckConstraint("CK_Progress_CompletionRate", "[CompletionRate] BETWEEN 0 AND 100");
-
-                            t.HasCheckConstraint("CK_Progress_TotalScores", "[TotalAssignmentScore] >= 0 AND [TotalExamScore] >= 0");
-                        });
+                    b.ToTable("Progresses");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Question", b =>
@@ -329,10 +279,13 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AssignmentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasMaxLength(3000)
+                        .HasColumnType("nvarchar(3000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -341,6 +294,9 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         .IsRequired()
                         .HasMaxLength(34)
                         .HasColumnType("nvarchar(34)");
+
+                    b.Property<int?>("ExamId")
+                        .HasColumnType("int");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -432,15 +388,15 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         {
                             Id = "a0d9ec33-7b25-4f40-9f4f-1e4d0f2e9842",
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "30ee71ba-6b4d-4390-ac15-a93c80221440",
-                            CreatedAt = new DateTime(2025, 2, 5, 13, 46, 4, 3, DateTimeKind.Utc).AddTicks(2768),
+                            ConcurrencyStamp = "d1092212-4144-4596-83d2-c1e6bfaa133e",
+                            CreatedAt = new DateTime(2025, 2, 10, 15, 31, 51, 945, DateTimeKind.Utc).AddTicks(1466),
                             Email = "admin@ntt.com",
                             EmailConfirmed = true,
                             FullName = "Admin",
                             LockoutEnabled = false,
                             NormalizedEmail = "ADMIN@NTT.COM",
                             NormalizedUserName = "ADMIN",
-                            PasswordHash = "AQAAAAIAAYagAAAAELYNLxsnH7ucCXgSd8q9IT8aCgTF1IJ/eSR19foxLvv2hFScemfjuruTycqD1+qXeQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEI6w8dSZKsmshV6aDsg9b3zBPJ+lr2b5FTNd7m+ZxTx+HhSVbaL0C4TK+s05PHL+nA==",
                             PhoneNumberConfirmed = false,
                             SecurityStamp = "d4d4d4d4-d4d4-4d4d-d4d4-d4d4d4d4d4d4",
                             TwoFactorEnabled = false,
@@ -625,29 +581,14 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 {
                     b.HasBaseType("Be_QuanLyKhoaHoc.Identity.Entities.Question");
 
-                    b.Property<int?>("AssignmentId")
-                        .HasColumnType("int");
-
                     b.Property<string>("CorrectAnswer")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<int?>("ExamId")
-                        .HasColumnType("int");
-
                     b.HasIndex("AssignmentId");
 
                     b.HasIndex("ExamId");
-
-                    b.ToTable("Questions", t =>
-                        {
-                            t.Property("AssignmentId")
-                                .HasColumnName("FillInBlankQuestion_AssignmentId");
-
-                            t.Property("ExamId")
-                                .HasColumnName("FillInBlankQuestion_ExamId");
-                        });
 
                     b.HasDiscriminator().HasValue("FillInBlankQuestion");
                 });
@@ -656,9 +597,6 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 {
                     b.HasBaseType("Be_QuanLyKhoaHoc.Identity.Entities.Question");
 
-                    b.Property<int?>("AssignmentId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Choices")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -666,56 +604,18 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     b.Property<int>("CorrectAnswerIndex")
                         .HasColumnType("int");
 
-                    b.Property<string>("Difficulty")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int?>("ExamId")
-                        .HasColumnType("int");
-
                     b.HasIndex("AssignmentId");
 
                     b.HasIndex("ExamId");
 
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_MultipleChoiceQuestion_CorrectIndex", "[CorrectAnswerIndex] >= 0");
-                        });
-
                     b.HasDiscriminator().HasValue("MultipleChoiceQuestion");
-                });
-
-            modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Answer", b =>
-                {
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", "Assignment")
-                        .WithMany()
-                        .HasForeignKey("AssignmentId");
-
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Exam", "Exam")
-                        .WithMany()
-                        .HasForeignKey("ExamId");
-
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Question", "Question")
-                        .WithMany()
-                        .HasForeignKey("QuestionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Assignment");
-
-                    b.Navigation("Exam");
-
-                    b.Navigation("Question");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", b =>
                 {
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Lesson", "Lesson")
-                        .WithMany("Assignments")
-                        .HasForeignKey("LessonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .WithOne("Assignments")
+                        .HasForeignKey("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", "LessonId");
 
                     b.Navigation("Lesson");
                 });
@@ -724,15 +624,11 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 {
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", "Assignment")
                         .WithMany()
-                        .HasForeignKey("AssignmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("AssignmentId");
 
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.User", "Student")
                         .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("StudentId");
 
                     b.Navigation("Assignment");
 
@@ -742,7 +638,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Course", b =>
                 {
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.User", "Lecturer")
-                        .WithMany("Courses")
+                        .WithMany()
                         .HasForeignKey("LecturerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -753,9 +649,9 @@ namespace Be_QuanLyKhoaHoc.Migrations
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Exam", b =>
                 {
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Course", "Course")
-                        .WithMany("Exams")
+                        .WithMany()
                         .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Course");
@@ -766,13 +662,12 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Exam", "Exam")
                         .WithMany()
                         .HasForeignKey("ExamId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.User", "Student")
                         .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("StudentId");
 
                     b.Navigation("Exam");
 
@@ -782,9 +677,9 @@ namespace Be_QuanLyKhoaHoc.Migrations
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Lesson", b =>
                 {
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Course", "Course")
-                        .WithMany("Lessons")
+                        .WithMany()
                         .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Course");
@@ -795,7 +690,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Lesson", "Lesson")
                         .WithMany("LessonContents")
                         .HasForeignKey("LessonId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Lesson");
@@ -805,15 +700,11 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 {
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Course", "Course")
                         .WithMany()
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CourseId");
 
                     b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.User", "Student")
                         .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("StudentId");
 
                     b.Navigation("Course");
 
@@ -873,24 +764,32 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.FillInBlankQuestion", b =>
                 {
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", null)
+                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", "Assignment")
                         .WithMany("FillInBlankQuestions")
                         .HasForeignKey("AssignmentId");
 
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Exam", null)
+                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Exam", "Exam")
                         .WithMany("FillInBlankQuestions")
                         .HasForeignKey("ExamId");
+
+                    b.Navigation("Assignment");
+
+                    b.Navigation("Exam");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.MultipleChoiceQuestion", b =>
                 {
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", null)
+                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", "Assignment")
                         .WithMany("MultipleChoiceQuestions")
                         .HasForeignKey("AssignmentId");
 
-                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Exam", null)
+                    b.HasOne("Be_QuanLyKhoaHoc.Identity.Entities.Exam", "Exam")
                         .WithMany("MultipleChoiceQuestions")
                         .HasForeignKey("ExamId");
+
+                    b.Navigation("Assignment");
+
+                    b.Navigation("Exam");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Assignment", b =>
@@ -898,13 +797,6 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     b.Navigation("FillInBlankQuestions");
 
                     b.Navigation("MultipleChoiceQuestions");
-                });
-
-            modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Course", b =>
-                {
-                    b.Navigation("Exams");
-
-                    b.Navigation("Lessons");
                 });
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Exam", b =>
@@ -916,14 +808,10 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
             modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.Lesson", b =>
                 {
-                    b.Navigation("Assignments");
+                    b.Navigation("Assignments")
+                        .IsRequired();
 
                     b.Navigation("LessonContents");
-                });
-
-            modelBuilder.Entity("Be_QuanLyKhoaHoc.Identity.Entities.User", b =>
-                {
-                    b.Navigation("Courses");
                 });
 #pragma warning restore 612, 618
         }

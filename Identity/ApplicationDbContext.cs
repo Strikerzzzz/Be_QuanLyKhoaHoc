@@ -58,28 +58,6 @@ namespace Be_QuanLyKhoaHoc.Identity
                 new IdentityUserRole<string> { UserId = adminUserId, RoleId = lecturerRoleId },
                 new IdentityUserRole<string> { UserId = adminUserId, RoleId = userRoleId }
             );
-
-            builder.Entity<Course>().ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_Course_Price", "[Price] >= 0");
-            });
-
-            builder.Entity<AssignmentResult>().ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_AssignmentResult_Score", "[Score] BETWEEN 0 AND 100");
-            });
-
-            builder.Entity<Progress>().ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_Progress_CompletionRate", "[CompletionRate] BETWEEN 0 AND 100");
-                t.HasCheckConstraint("CK_Progress_TotalScores", "[TotalAssignmentScore] >= 0 AND [TotalExamScore] >= 0");
-            });
-
-            builder.Entity<MultipleChoiceQuestion>().ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_MultipleChoiceQuestion_CorrectIndex", "[CorrectAnswerIndex] >= 0");
-            });
-
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         public int LessonId { get; set; }
 
         [Required]
-        public int CourseId { get; set; }
+        public int? CourseId { get; set; }
 
         [ForeignKey(nameof(CourseId))]
         public Course? Course { get; set; }
@@ -20,6 +20,6 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
 
         public ICollection<LessonContent>? LessonContents { get; set; }
 
-        public ICollection<Assignment>? Assignments { get; set; }
+        public Assignment Assignments { get; set; } = null!;
     }
 }

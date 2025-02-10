@@ -8,7 +8,5 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public string? AvatarUrl { get; set; }
 
-        // Quan hệ khóa học cho Giảng viên (Lecturer)
-        public ICollection<Course>? Courses { get; set; }
     }
 }

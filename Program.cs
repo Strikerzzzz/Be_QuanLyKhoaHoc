@@ -30,7 +30,7 @@ builder.Services.AddCors(options =>
 // Thêm dịch vụ Identity
 builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
-    // Cấu hình tùy chọn cho Identity (có thể tùy chỉnh theo yêu cầu)
+    // Cấu hình tùy chọn cho Identity
     options.Password.RequireDigit = true;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
@@ -98,7 +98,6 @@ var app = builder.Build();
 app.UseCors("AllowSpecificOrigin");
 
 // Configure the HTTP request pipeline.
-
 app.UseRouting();
 if (app.Environment.IsDevelopment())
 {
@@ -118,7 +117,6 @@ else
 
 app.UseHttpsRedirection();
 
-// Middleware cho xác thực và phân quyền
 app.UseAuthentication();
 app.UseAuthorization();
 
