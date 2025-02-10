@@ -26,5 +26,6 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         [ForeignKey(nameof(LecturerId))]
         public User? Lecturer { get; set; }
 
+        public Exam Exam { get; set; } = null!;
     }
 }

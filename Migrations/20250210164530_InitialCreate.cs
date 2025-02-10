@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Be_QuanLyKhoaHoc.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -290,7 +290,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 {
                     AssignmentId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    LessonId = table.Column<int>(type: "int", nullable: true),
+                    LessonId = table.Column<int>(type: "int", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
@@ -301,7 +301,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         name: "FK_Assignments_Lessons_LessonId",
                         column: x => x.LessonId,
                         principalTable: "Lessons",
-                        principalColumn: "LessonId");
+                        principalColumn: "LessonId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -333,7 +334,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     ResultId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     StudentId = table.Column<string>(type: "nvarchar(450)", nullable: true),
-                    AssignmentId = table.Column<int>(type: "int", nullable: true),
+                    AssignmentId = table.Column<int>(type: "int", nullable: false),
                     Score = table.Column<float>(type: "real", nullable: false),
                     SubmissionTime = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -349,7 +350,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         name: "FK_AssignmentResults_Assignments_AssignmentId",
                         column: x => x.AssignmentId,
                         principalTable: "Assignments",
-                        principalColumn: "AssignmentId");
+                        principalColumn: "AssignmentId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -396,7 +398,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
             migrationBuilder.InsertData(
                 table: "AspNetUsers",
                 columns: new[] { "Id", "AccessFailedCount", "AvatarUrl", "ConcurrencyStamp", "CreatedAt", "Email", "EmailConfirmed", "FullName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PhoneNumber", "PhoneNumberConfirmed", "SecurityStamp", "TwoFactorEnabled", "UserName" },
-                values: new object[] { "a0d9ec33-7b25-4f40-9f4f-1e4d0f2e9842", 0, null, "d1092212-4144-4596-83d2-c1e6bfaa133e", new DateTime(2025, 2, 10, 15, 31, 51, 945, DateTimeKind.Utc).AddTicks(1466), "admin@ntt.com", true, "Admin", false, null, "ADMIN@NTT.COM", "ADMIN", "AQAAAAIAAYagAAAAEI6w8dSZKsmshV6aDsg9b3zBPJ+lr2b5FTNd7m+ZxTx+HhSVbaL0C4TK+s05PHL+nA==", null, false, "d4d4d4d4-d4d4-4d4d-d4d4-d4d4d4d4d4d4", false, "admin" });
+                values: new object[] { "a0d9ec33-7b25-4f40-9f4f-1e4d0f2e9842", 0, null, "ff2dc180-1da5-47b6-9911-0ff2812597f9", new DateTime(2025, 2, 10, 16, 45, 29, 909, DateTimeKind.Utc).AddTicks(9571), "admin@ntt.com", true, "Admin", false, null, "ADMIN@NTT.COM", "ADMIN", "AQAAAAIAAYagAAAAEEr52sH41BXI5uOK00BwMshuKFRP8D0V5KKy3YzCvDb2CSDTmWTVbae5C2zhABfpWA==", null, false, "d4d4d4d4-d4d4-4d4d-d4d4-d4d4d4d4d4d4", false, "admin" });
 
             migrationBuilder.InsertData(
                 table: "AspNetUserRoles",
@@ -461,8 +463,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 name: "IX_Assignments_LessonId",
                 table: "Assignments",
                 column: "LessonId",
-                unique: true,
-                filter: "[LessonId] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Courses_LecturerId",
@@ -482,7 +483,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Exams_CourseId",
                 table: "Exams",
-                column: "CourseId");
+                column: "CourseId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_LessonContents_LessonId",

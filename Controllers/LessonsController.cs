@@ -20,7 +20,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
             _context = context;
         }
 
-        // Lấy danh sách bài học theo khóa học
         [HttpGet("course/{courseId}")]
         [AllowAnonymous]
         [ProducesResponseType(typeof(Result<IEnumerable<Lesson>>), 200)]
@@ -38,7 +37,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
                 }
 
-                // Chỉ lấy CourseId và Title
                 var lessons = await _context.Lessons
                     .Where(l => l.CourseId == courseId)
                     .Select(l => new
@@ -56,40 +54,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        // Lấy chi tiết một bài học
-        [HttpGet("{id}")]
-        [ProducesResponseType(typeof(Result<Lesson>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 404)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
-        [ProducesResponseType(typeof(Result<object>), 403)]
-        [ProducesResponseType(typeof(Result<object>), 500)]
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        public async Task<IActionResult> GetLesson(int id)
-        {
-
-            try
-            {
-                var lesson = await _context.Lessons
-                    .Include(l => l.Course)
-                    .FirstOrDefaultAsync(l => l.LessonId == id);
-
-                if (lesson == null)
-                {
-                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
-                }
-
-
-                return Ok(Result<Lesson>.Success(lesson));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
-            }
-        }
-
-        // Tạo mới bài học
         [HttpPost]
-        [ProducesResponseType(typeof(Result<Lesson>), 201)]
+        [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 403)]
@@ -122,10 +88,10 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     CourseId = request.CourseId
                 };
 
-                _context.Lessons.Add(newLesson);
+                await _context.Lessons.AddAsync(newLesson);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction(nameof(GetLesson), new { id = newLesson.LessonId }, Result<Lesson>.Success(newLesson));
+                return Ok(Result<string>.Success("Thêm bài học thành công."));
             }
             catch (Exception ex)
             {
@@ -151,19 +117,16 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var lesson = await _context.Lessons
-                    .Include(l => l.Course)
-                    .FirstOrDefaultAsync(l => l.LessonId == id);
+                var affectedRows = await _context.Lessons
+                    .Where(l => l.LessonId == id && l.Course.LecturerId == lecturerId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.Title, request.Title)
+                    );
 
-                if (lesson == null)
+                if (affectedRows == 0)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
                 }
-
-                lesson.Title = request.Title;
-
-                _context.Entry(lesson).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
 
                 return Ok(Result<string>.Success("Cập nhật bài học thành công!"));
             }
@@ -190,16 +153,37 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var lesson = await _context.Lessons.Include(l => l.Course).FirstOrDefaultAsync(l => l.LessonId == id);
-                if (lesson == null)
+                var lessonInfo = await _context.Lessons
+                    .AsNoTracking()
+                    .Where(l => l.LessonId == id)
+                    .Select(l => new
+                    {
+                        l.LessonId,
+                        LecturerId = l.Course != null ? l.Course.LecturerId : null
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (lessonInfo == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
                 }
+                if (lessonInfo.LecturerId != lecturerId)
+                {
+                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xóa bài học này." }));
+                }
 
-                _context.Lessons.Remove(lesson);
-                await _context.SaveChangesAsync();
+                var affectedRows = await _context.Lessons
+                    .Where(l => l.LessonId == id)
+                    .ExecuteDeleteAsync();
 
-                return Ok(Result<string>.Success("Xóa bài học thành công!"));
+                if (affectedRows > 0)
+                {
+                    return Ok(Result<string>.Success("Xóa bài học thành công!"));
+                }
+                else
+                {
+                    return StatusCode(500, Result<object>.Failure(new[] { "Xóa bài học thất bại." }));
+                }
             }
             catch (Exception ex)
             {

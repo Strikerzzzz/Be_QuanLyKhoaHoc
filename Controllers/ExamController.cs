@@ -32,15 +32,18 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             try
             {
-                var course = await _context.Courses.FindAsync(courseId);
-                if (course == null)
+                var courseExists = await _context.Courses
+                       .AsNoTracking()
+                       .AnyAsync(c => c.CourseId == courseId);
+                if (!courseExists)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
                 }
 
                 var exams = await _context.Exams
+                    .AsNoTracking()
                     .Where(e => e.CourseId == courseId)
-                    .Select(e => new { e.ExamId, e.Title })
+                    .Select(e => new { e.ExamId, e.Title, e.Description })
                     .ToListAsync();
 
                 return Ok(Result<IEnumerable<object>>.Success(exams));
@@ -64,9 +67,10 @@ namespace Be_QuanLyKhoaHoc.Controllers
             try
             {
                 var exam = await _context.Exams
-                    .Include(e => e.MultipleChoiceQuestions)
-                    .Include(e => e.FillInBlankQuestions)
-                    .FirstOrDefaultAsync(e => e.ExamId == id);
+                   .AsNoTracking()
+                   .Include(e => e.MultipleChoiceQuestions)
+                   .Include(e => e.FillInBlankQuestions)
+                   .FirstOrDefaultAsync(e => e.ExamId == id);
 
                 if (exam == null)
                 {
@@ -83,7 +87,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // Tạo mới bài kiểm tra
         [HttpPost]
-        [ProducesResponseType(typeof(Result<Exam>), 201)]
+        [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
@@ -105,8 +109,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var course = await _context.Courses.FindAsync(request.CourseId);
-                if (course == null || course.LecturerId != lecturerId)
+                var courseExists = await _context.Courses
+                    .AsNoTracking()
+                    .AnyAsync(c => c.CourseId == request.CourseId && c.LecturerId == lecturerId);
+
+                if (!courseExists)
                 {
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền tạo bài kiểm tra cho khóa học này." }));
                 }
@@ -118,10 +125,10 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     CourseId = request.CourseId
                 };
 
-                _context.Exams.Add(newExam);
+                await _context.Exams.AddAsync(newExam);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction(nameof(GetExam), new { id = newExam.ExamId }, Result<Exam>.Success(newExam));
+                return Ok(Result<string>.Success("Tạo mới khóa học thành công."));
             }
             catch (Exception ex)
             {
@@ -148,24 +155,40 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var exam = await _context.Exams.Include(e => e.Course).FirstOrDefaultAsync(e => e.ExamId == id);
-                if (exam == null)
+                var examInfo = await _context.Exams
+                .AsNoTracking()
+                .Where(e => e.ExamId == id)
+                .Select(e => new
+                {
+                    e.ExamId,
+                    LecturerId = e.Course != null ? e.Course.LecturerId : null
+                })
+                .FirstOrDefaultAsync();
+
+                if (examInfo == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
 
-                if (exam.Course.LecturerId != lecturerId)
+                if (examInfo.LecturerId != lecturerId)
                 {
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền chỉnh sửa bài kiểm tra này." }));
                 }
+                var affectedRows = await _context.Exams
+                    .Where(e => e.ExamId == id)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(e => e.Title, request.Title)
+                        .SetProperty(e => e.Description, request.Description)
+                    );
 
-                exam.Title = request.Title;
-                exam.Description = request.Description;
-
-                _context.Entry(exam).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-
-                return Ok(Result<string>.Success("Cập nhật bài kiểm tra thành công!"));
+                if (affectedRows > 0)
+                {
+                    return Ok(Result<string>.Success("Cập nhật bài kiểm tra thành công!"));
+                }
+                else
+                {
+                    return StatusCode(500, Result<object>.Failure(new[] { "Cập nhật bài kiểm tra thất bại." }));
+                }
             }
             catch (Exception ex)
             {
@@ -191,21 +214,38 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var exam = await _context.Exams.Include(e => e.Course).FirstOrDefaultAsync(e => e.ExamId == id);
-                if (exam == null)
+                var examInfo = await _context.Exams
+                    .AsNoTracking()
+                    .Where(e => e.ExamId == id)
+                    .Select(e => new
+                    {
+                        e.ExamId,
+                        CourseLecturerId = e.Course != null ? e.Course.LecturerId : null
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (examInfo == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
 
-                if (exam.Course.LecturerId != lecturerId)
+                if (examInfo.CourseLecturerId == null || examInfo.CourseLecturerId != lecturerId)
                 {
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xóa bài kiểm tra này." }));
                 }
 
-                _context.Exams.Remove(exam);
-                await _context.SaveChangesAsync();
+                var affectedRows = await _context.Exams
+                    .Where(e => e.ExamId == id)
+                    .ExecuteDeleteAsync();
 
-                return Ok(Result<string>.Success("Xóa bài kiểm tra thành công!"));
+                if (affectedRows > 0)
+                {
+                    return Ok(Result<string>.Success("Xóa bài kiểm tra thành công!"));
+                }
+                else
+                {
+                    return StatusCode(500, Result<object>.Failure(new[] { "Xóa bài kiểm tra thất bại." }));
+                }
             }
             catch (Exception ex)
             {
@@ -227,6 +267,14 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         public async Task<IActionResult> SubmitExam(int examId, [FromBody] SubmitExamRequest request)
         {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                                       .SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
+                                       .ToArray();
+                return BadRequest(Result<object>.Failure(errors));
+            }
+
             var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(studentId))
             {
@@ -240,7 +288,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
-
+                var hasSubmitted = await _context.ExamResults
+                    .AnyAsync(er => er.ExamId == examId && er.StudentId == studentId);
+                if (hasSubmitted)
+                {
+                    return BadRequest(Result<object>.Failure(new[] { "Bạn đã nộp bài kiểm tra này rồi." }));
+                }
                 var examResult = new ExamResult
                 {
                     StudentId = studentId,
@@ -249,7 +302,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     SubmissionTime = DateTime.UtcNow
                 };
 
-                _context.ExamResults.Add(examResult);
+                await _context.ExamResults.AddAsync(examResult);
                 await _context.SaveChangesAsync();
 
                 return Ok(Result<string>.Success("Nộp bài kiểm tra thành công!"));
@@ -278,6 +331,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             try
             {
                 var examResult = await _context.ExamResults
+                    .AsNoTracking()
                     .Where(er => er.ExamId == examId && er.StudentId == studentId)
                     .Select(er => new
                     {
@@ -303,7 +357,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // Giảng viên xem danh sách kết quả của học viên
         [HttpGet("{examId}/results")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
-        [ProducesResponseType(typeof(Result<string>), 200)]
+        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
@@ -318,26 +372,30 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var exam = await _context.Exams.Include(e => e.Course)
-                    .FirstOrDefaultAsync(e => e.ExamId == examId);
+                var examInfo = await _context.Exams
+                .AsNoTracking()
+                .Where(e => e.ExamId == examId)
+                .Select(e => new { e.ExamId, LecturerId = e.Course.LecturerId })
+                .FirstOrDefaultAsync();
 
-                if (exam == null)
+                if (examInfo == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
 
-                if (exam.Course.LecturerId != lecturerId)
+                if (examInfo.LecturerId != lecturerId)
                 {
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xem kết quả bài kiểm tra này." }));
                 }
 
+                // Truy vấn kết quả bài kiểm tra của tất cả sinh viên dựa trên examId
                 var results = await _context.ExamResults
+                    .AsNoTracking()
                     .Where(er => er.ExamId == examId)
-                    .Include(er => er.Student)
                     .Select(er => new
                     {
                         er.ResultId,
-                        StudentName = er.Student!.FullName,
+                        StudentName = er.Student.FullName,
                         er.Score,
                         er.SubmissionTime
                     })
@@ -351,9 +409,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        // Định nghĩa request model
         public record SubmitExamRequest(float Score);
-
-
     }
 }

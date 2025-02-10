@@ -7,7 +7,9 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
     {
         [Key]
         public int AssignmentId { get; set; }
-        public int? LessonId { get; set; }
+
+        [Required]
+        public int LessonId { get; set; }
 
         [ForeignKey(nameof(LessonId))]
         public Lesson? Lesson { get; set; }
