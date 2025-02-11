@@ -22,7 +22,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         [HttpGet("course/{courseId}")]
         [AllowAnonymous]
-        [ProducesResponseType(typeof(Result<IEnumerable<Lesson>>), 200)]
+        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
 
@@ -41,7 +41,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     .Where(l => l.CourseId == courseId)
                     .Select(l => new
                     {
-                        l.CourseId,
+                        l.LessonId,
                         l.Title
                     })
                     .ToListAsync();

@@ -20,7 +20,36 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             _context = context;
         }
+        [HttpGet("{id}")]
+        [ProducesResponseType(typeof(Result<object>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 403)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> GetCourseTitleById(int id)
+        {
+            try
+            {
+                // Truy vấn lấy ra thuộc tính Title của course có CourseId = id
+                var courseTitle = await _context.Courses
+                    .AsNoTracking()
+                    .Where(c => c.CourseId == id)
+                    .Select(c => c.Title)
+                    .FirstOrDefaultAsync();
 
+                if (courseTitle == null)
+                {
+                    // Nếu không tìm thấy course nào thì trả về NotFound
+                    return NotFound(Result<object>.Failure(new[] { "Course not found." }));
+                }
+
+                return Ok(Result<object>.Success(courseTitle));
+            }
+            catch (Exception ex)
+            {
+                // Xử lý lỗi, trả về mã 500 kèm thông tin lỗi
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
         // GET: api/Courses/public  
         [HttpGet("public")]
         [AllowAnonymous]
