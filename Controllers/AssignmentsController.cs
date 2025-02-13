@@ -5,6 +5,8 @@ using System.Security.Claims;
 using Be_QuanLyKhoaHoc.Identity.Entities;
 using SampleProject.Common;
 using Be_QuanLyKhoaHoc.Identity;
+using Be_QuanLyKhoaHoc.Enums;
+using System.Linq;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -53,29 +55,70 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        // Lấy chi tiết bài tập
-        [HttpGet("{id}")]
+        [HttpGet("{assignmentId}/questions")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<Assignment>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
-        public async Task<IActionResult> GetAssignment(int id)
+        public async Task<IActionResult> GetQuestionsByAssignment(int assignmentId)
         {
             try
             {
-                var assignment = await _context.Assignments
+                var assignmentExists = await _context.Assignments
                     .AsNoTracking()
-                    .Include(a => a.MultipleChoiceQuestions)
-                    .Include(a => a.FillInBlankQuestions)
-                    .FirstOrDefaultAsync(a => a.AssignmentId == id);
-
-                if (assignment == null)
+                    .AnyAsync(a => a.AssignmentId == assignmentId);
+                if (!assignmentExists)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài tập." }));
                 }
 
-                return Ok(Result<Assignment>.Success(assignment));
+                // Truy vấn cho MultipleChoiceQuestion
+                var multipleChoiceQuestions = await _context.Questions
+                    .OfType<MultipleChoiceQuestion>()
+                    .Where(q => q.AssignmentId == assignmentId)
+                    .OrderBy(q => q.CreatedAt)
+                    .Select(q => new
+                    {
+                        q.Id,
+                        q.Content,
+                        q.Type,
+                        q.CreatedAt,
+                        Choices = q.Choices,
+                        CorrectAnswerIndex = (int?)q.CorrectAnswerIndex, // ép kiểu về int?
+                        CorrectAnswer = (string)null
+                    })
+                    .ToListAsync();
+
+                // Truy vấn cho FillInBlankQuestion
+                var fillInBlankQuestions = await _context.Questions
+                    .OfType<FillInBlankQuestion>()
+                    .Where(q => q.AssignmentId == assignmentId)
+                    .OrderBy(q => q.CreatedAt)
+                    .Select(q => new
+                    {
+                        q.Id,
+                        q.Content,
+                        q.Type,
+                        q.CreatedAt,
+                        Choices = (string)null,
+                        CorrectAnswerIndex = (int?)null,
+                        CorrectAnswer = q.CorrectAnswer
+                    })
+                    .ToListAsync();
+
+                // Hợp nhất danh sách và sắp xếp theo CreatedAt
+                var questions = multipleChoiceQuestions
+                    .Concat(fillInBlankQuestions)
+                    .OrderBy(q => q.CreatedAt)
+                    .ToList();
+
+                if (!questions.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy câu hỏi cho bài tập này." }));
+                }
+
+                return Ok(Result<IEnumerable<object>>.Success(questions));
             }
             catch (Exception ex)
             {
@@ -260,6 +303,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
+
+
         [HttpPost("{assignmentId}/submit")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [ProducesResponseType(typeof(Result<string>), 200)]
@@ -418,9 +463,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
 
 
-        public record CreateAssignmentRequest(int LessonId, string Title, string? Description, string? AssignmentType);
-        public record UpdateAssignmentRequest(string Title, string? Description, string? AssignmentType);
+        public record CreateAssignmentRequest(int LessonId, string Title, string? Description);
+        public record UpdateAssignmentRequest(string Title, string? Description);
 
-        public record SubmitAssignmentRequest (float Score);
+        public record SubmitAssignmentRequest(float Score);
     }
 }

@@ -5,6 +5,7 @@ using System.Security.Claims;
 using Be_QuanLyKhoaHoc.Identity.Entities;
 using SampleProject.Common;
 using Be_QuanLyKhoaHoc.Identity;
+using Be_QuanLyKhoaHoc.Enums;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -54,30 +55,71 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        //Lấy chi tiết bài kiểm tra
-        [HttpGet("{id}")]
+        [HttpGet("{examId}/questions")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<Exam>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
-
-        public async Task<IActionResult> GetExam(int id)
+        public async Task<IActionResult> GetQuestionsByExam(int examId)
         {
             try
             {
-                var exam = await _context.Exams
-                   .AsNoTracking()
-                   .Include(e => e.MultipleChoiceQuestions)
-                   .Include(e => e.FillInBlankQuestions)
-                   .FirstOrDefaultAsync(e => e.ExamId == id);
-
-                if (exam == null)
+                // Kiểm tra sự tồn tại của bài kiểm tra
+                var examExists = await _context.Exams
+                    .AsNoTracking()
+                    .AnyAsync(e => e.ExamId == examId);
+                if (!examExists)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
 
-                return Ok(Result<Exam>.Success(exam));
+                // Truy vấn cho câu hỏi kiểu MultipleChoiceQuestion
+                var multipleChoiceQuestions = await _context.Questions
+                    .OfType<MultipleChoiceQuestion>()
+                    .Where(q => q.ExamId == examId)
+                    .OrderBy(q => q.CreatedAt)
+                    .Select(q => new
+                    {
+                        q.Id,
+                        q.Content,
+                        q.Type,
+                        q.CreatedAt,
+                        Choices = q.Choices,
+                        CorrectAnswerIndex = (int?)q.CorrectAnswerIndex,
+                        CorrectAnswer = (string)null
+                    })
+                    .ToListAsync();
+
+                // Truy vấn cho câu hỏi kiểu FillInBlankQuestion
+                var fillInBlankQuestions = await _context.Questions
+                    .OfType<FillInBlankQuestion>()
+                    .Where(q => q.ExamId == examId)
+                    .OrderBy(q => q.CreatedAt)
+                    .Select(q => new
+                    {
+                        q.Id,
+                        q.Content,
+                        q.Type,
+                        q.CreatedAt,
+                        Choices = (string)null,
+                        CorrectAnswerIndex = (int?)null,
+                        CorrectAnswer = q.CorrectAnswer
+                    })
+                    .ToListAsync();
+
+                // Hợp nhất danh sách và sắp xếp theo CreatedAt
+                var questions = multipleChoiceQuestions
+                    .Concat(fillInBlankQuestions)
+                    .OrderBy(q => q.CreatedAt)
+                    .ToList();
+
+                if (!questions.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy câu hỏi cho bài kiểm tra này." }));
+                }
+
+                return Ok(Result<IEnumerable<object>>.Success(questions));
             }
             catch (Exception ex)
             {
