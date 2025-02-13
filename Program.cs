@@ -64,6 +64,8 @@ builder.Services.AddScoped<TokenProvider>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<LoginUser>();
 builder.Services.AddScoped<IAppEmailSender, AppEmailSender>();
+builder.Services.AddScoped<QuestionService>();
+
 
 builder.Services.AddAuthorization(options =>
 {

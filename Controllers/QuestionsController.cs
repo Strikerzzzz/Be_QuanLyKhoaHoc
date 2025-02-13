@@ -1,6 +1,7 @@
 ﻿using Be_QuanLyKhoaHoc.Enums;
 using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Identity.Entities;
+using Be_QuanLyKhoaHoc.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +16,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
     public class QuestionsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly QuestionService _questionService;
 
-        public QuestionsController(ApplicationDbContext context)
+        public QuestionsController(ApplicationDbContext context, QuestionService questionService)
         {
             _context = context;
+            _questionService = questionService;
         }
 
 
@@ -37,6 +40,56 @@ namespace Be_QuanLyKhoaHoc.Controllers
             int? ExamId
         );
 
+        [HttpGet("{entityType}/{entityId}/questions/{questionType:int}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        public async Task<IActionResult> GetQuestions(string entityType, int entityId, Enums.QuestionType questionType)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(entityType))
+                    return BadRequest("entityType không hợp lệ.");
+
+                string entityKey;
+                if (entityType.ToLower() == "assignment")
+                {
+                    entityKey = "AssignmentId";
+                    if (!await _questionService.CheckEntityExists<Assignment>(entityId, entityKey))
+                        return NotFound(Result<object>.Failure(new[] { "Không tìm thấy assignment." }));
+                }
+                else if (entityType.ToLower() == "exam")
+                {
+                    entityKey = "ExamId";
+                    if (!await _questionService.CheckEntityExists<Exam>(entityId, entityKey))
+                        return NotFound(Result<object>.Failure(new[] { "Không tìm thấy exam." }));
+                }
+                else
+                {
+                    return BadRequest("entityType không hợp lệ.");
+                }
+
+                List<object> questions = questionType switch
+                {
+                    Enums.QuestionType.MultipleChoice => await _questionService.GetMultipleChoiceQuestions(entityId, entityKey),
+                    Enums.QuestionType.FillInTheBlank => await _questionService.GetFillInBlankQuestions(entityId, entityKey),
+                    _ => throw new ArgumentException("Loại câu hỏi không hợp lệ.")
+                };
+
+                if (questions == null || !questions.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { $"Không tìm thấy câu hỏi cho {entityType} này." }));
+                }
+
+                return Ok(Result<IEnumerable<object>>.Success(questions));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
 
         [HttpPost]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
