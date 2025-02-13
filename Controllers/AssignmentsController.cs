@@ -22,38 +22,50 @@ namespace Be_QuanLyKhoaHoc.Controllers
             _context = context;
         }
 
-        // Lấy danh sách bài tập theo bài học
         [HttpGet("lesson/{lessonId}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
-        public async Task<IActionResult> GetAssignmentsByLesson(int lessonId)
+        public async Task<IActionResult> GetAssignmentByLesson(int lessonId)
         {
             try
             {
-                var lessonExists = await _context.Lessons
+                // Kiểm tra sự tồn tại của bài học
+                var lesson = await _context.Lessons
                     .AsNoTracking()
-                    .AnyAsync(l => l.LessonId == lessonId);
-                if (!lessonExists)
+                    .FirstOrDefaultAsync(l => l.LessonId == lessonId);
+
+                if (lesson == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
                 }
 
-                var assignments = await _context.Assignments
+                // Lấy bài tập của bài học (quan hệ 1-1)
+                var assignment = await _context.Assignments
                     .AsNoTracking()
                     .Where(a => a.LessonId == lessonId)
-                    .Select(a => new { a.AssignmentId, a.Title })
-                    .ToListAsync();
+                    .Select(a => new
+                    {
+                        a.AssignmentId,
+                        a.Title
+                    })
+                    .SingleOrDefaultAsync();
 
-                return Ok(Result<IEnumerable<object>>.Success(assignments));
+                if (assignment == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài tập cho bài học này." }));
+                }
+
+                return Ok(Result<object>.Success(assignment));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
 
         [HttpGet("{assignmentId}/questions")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]

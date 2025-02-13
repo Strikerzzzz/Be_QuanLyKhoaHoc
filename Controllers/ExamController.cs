@@ -21,39 +21,43 @@ namespace Be_QuanLyKhoaHoc.Controllers
             _context = context;
         }
 
-        //Lấy danh sách bài kiểm tra theo khóa học
         [HttpGet("course/{courseId}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
-
-        public async Task<IActionResult> GetExamsByCourse(int courseId)
+        public async Task<IActionResult> GetExamByCourse(int courseId)
         {
             try
             {
                 var courseExists = await _context.Courses
-                       .AsNoTracking()
-                       .AnyAsync(c => c.CourseId == courseId);
+                    .AsNoTracking()
+                    .AnyAsync(c => c.CourseId == courseId);
                 if (!courseExists)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
                 }
 
-                var exams = await _context.Exams
+                var exam = await _context.Exams
                     .AsNoTracking()
                     .Where(e => e.CourseId == courseId)
                     .Select(e => new { e.ExamId, e.Title, e.Description })
-                    .ToListAsync();
+                    .SingleOrDefaultAsync();
 
-                return Ok(Result<IEnumerable<object>>.Success(exams));
+                if (exam == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra cho khóa học này." }));
+                }
+
+                return Ok(Result<object>.Success(exam));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
 
         [HttpGet("{examId}/questions")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
