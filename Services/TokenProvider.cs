@@ -63,6 +63,7 @@ namespace Be_QuanLyKhoaHoc.Services
 
             return token;
         }
+
         public static string GenerateRefreshToken()
         {
             var randomNumber = new byte[32];
@@ -70,5 +71,18 @@ namespace Be_QuanLyKhoaHoc.Services
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber).Substring(0, 43);
         }
+
+        public RefreshToken CreateRefreshToken(string userId, string ipAddress)
+        {
+            return new RefreshToken
+            {
+                Token = GenerateRefreshToken(),
+                UserId = userId,
+                Expires = DateTime.UtcNow.AddDays(30), // Tuỳ chỉnh thời gian sống của refresh token
+                Created = DateTime.UtcNow,
+                CreatedByIp = ipAddress
+            };
+        }
+
     }
 }

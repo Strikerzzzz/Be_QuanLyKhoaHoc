@@ -9,6 +9,7 @@ using Be_QuanLyKhoaHoc.Services;
 using Be_QuanLyKhoaHoc.Services.Interfaces;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Net;
+using static Be_QuanLyKhoaHoc.Services.LoginUser;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -38,6 +39,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         public record AssignRoleRequest(string Email, string Role);
         public record RemoveRoleRequest(string Email, string Role);
         public record ConfirmEmailRequest(string Email, string Token);
+        public record RefreshTokenRequest(string RefreshToken);
+        public record RefreshTokenResponse(string AccessToken, string RefreshToken);
 
         // POST: /users/register
         [HttpPost("register")]
@@ -132,8 +135,36 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                var token = await _loginUser.Handle(new LoginUser.Request(request.Email, request.Password));
-                return Ok(Result<string>.Success(token));
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var loginResult = await _loginUser.Handle(new Request(request.Email, request.Password, ipAddress));
+
+                return Ok(Result<LoginResponse>.Success(loginResult));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
+            }
+        }
+
+        // --- Endpoint refresh token ---
+        [HttpPost("refresh-token")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(Result<RefreshTokenResponse>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 400)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(Result<object>.Failure(ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)).ToArray()));
+            }
+
+            try
+            {
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var loginResponse = await _loginUser.Refresh(request.RefreshToken, ipAddress);
+                var response = new RefreshTokenResponse(loginResponse.AccessToken, loginResponse.RefreshToken);
+                return Ok(Result<RefreshTokenResponse>.Success(response));
             }
             catch (Exception ex)
             {
@@ -312,8 +343,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // POST: /users/lock
         [HttpPost("lock")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
-        [ProducesResponseType(typeof(Result<string>), 200)] 
-        [ProducesResponseType(typeof(Result<object>), 400)] 
+        [ProducesResponseType(typeof(Result<string>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(object), 403)]
         [ProducesResponseType(typeof(Result<object>), 404)]

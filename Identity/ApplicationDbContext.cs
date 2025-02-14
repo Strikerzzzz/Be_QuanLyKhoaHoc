@@ -21,6 +21,7 @@ namespace Be_QuanLyKhoaHoc.Identity
         public DbSet<MultipleChoiceQuestion> MultipleChoiceQuestions { get; set; }
         public DbSet<FillInBlankQuestion> FillInBlankQuestions { get; set; }
         public DbSet<Progress> Progresses { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

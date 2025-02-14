@@ -2,7 +2,9 @@
 using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Identity.Entities;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System;
+using static Be_QuanLyKhoaHoc.Controllers.UsersController;
 
 namespace Be_QuanLyKhoaHoc.Services
 {
@@ -21,9 +23,9 @@ namespace Be_QuanLyKhoaHoc.Services
             _userManager = userManager;
         }
 
-        public sealed record Request(string Email, string Password);
-
-        public async Task<string> Handle(Request request)
+        public sealed record Request(string Email, string Password, string IpAddress);
+        public sealed record LoginResponse(string AccessToken, string RefreshToken);
+        public async Task<LoginResponse> Handle(Request request)
         {
             User? user = await _context.Users.GetByEmailAsync(request.Email);
 
@@ -63,9 +65,36 @@ namespace Be_QuanLyKhoaHoc.Services
             }
 
             await _userManager.ResetAccessFailedCountAsync(user);
+            string accessToken = await _tokenProvider.Create(user);
+            var refreshToken = _tokenProvider.CreateRefreshToken(user.Id.ToString(), request.IpAddress);
 
-            string token = await _tokenProvider.Create(user);
-            return token;
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync();
+            return new LoginResponse(accessToken, refreshToken.Token);
+        }
+        public async Task<LoginResponse> Refresh(string refreshToken, string ipAddress)
+        {
+            var storedToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+
+            if (storedToken == null || !storedToken.IsActive)
+            {
+                throw new Exception("Refresh token không hợp lệ hoặc đã hết hạn.");
+            }
+
+            storedToken.Revoked = DateTime.UtcNow;
+            storedToken.RevokedByIp = ipAddress;
+
+            string newAccessToken = await _tokenProvider.Create(storedToken.User);
+
+            var newRefreshToken = _tokenProvider.CreateRefreshToken(storedToken.UserId, ipAddress);
+            storedToken.ReplacedByToken = newRefreshToken.Token;
+
+            _context.RefreshTokens.Add(newRefreshToken);
+            await _context.SaveChangesAsync();
+
+            return new LoginResponse(newAccessToken, newRefreshToken.Token);
         }
     }
 }
