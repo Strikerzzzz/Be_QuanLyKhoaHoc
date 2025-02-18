@@ -49,7 +49,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     .Select(a => new
                     {
                         a.AssignmentId,
-                        a.Title
+                        a.Title,
+                        a.Description
+                       
                     })
                     .SingleOrDefaultAsync();
 
