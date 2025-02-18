@@ -65,7 +65,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<LoginUser>();
 builder.Services.AddScoped<IAppEmailSender, AppEmailSender>();
 builder.Services.AddScoped<QuestionService>();
-
+builder.Services.AddSingleton<S3Service>();
 
 builder.Services.AddAuthorization(options =>
 {

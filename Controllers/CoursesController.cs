@@ -250,6 +250,54 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
+        // PUT /api/courses/{courseId}/avatar
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [HttpPut("{courseId}/avatar-course")]
+        [ProducesResponseType(typeof(Result<string>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 400)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 403)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> UpdateCourseAvatar(int courseId, [FromBody] UpdateAvatarRequest request)
+        {
+            var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(lecturerId))
+            {
+                return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
+            }
+
+            if (string.IsNullOrEmpty(request.AvatarObjectKey))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "AvatarObjectKey không được để trống." }));
+            }
+
+            try
+            {
+                // Kiểm tra khóa học và quyền sở hữu của giảng viên
+                var course = await _context.Courses
+                    .Where(c => c.CourseId == courseId && c.LecturerId == lecturerId)
+                    .FirstOrDefaultAsync();
+
+                if (course == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học hoặc không có quyền chỉnh sửa." }));
+                }
+
+                string cloudFrontDomain = "https://drui9ols58b43.cloudfront.net";
+                string avatarUrl = $"{cloudFrontDomain}/{request.AvatarObjectKey}";
+
+                // Cập nhật AvatarUrl của khóa học
+                course.AvatarUrl = avatarUrl;
+                await _context.SaveChangesAsync();
+
+                return Ok(Result<string>.Success("Cập nhật avatar thành công."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
 
         public record CreateCourseRequest(
             string Title,
@@ -276,6 +324,10 @@ namespace Be_QuanLyKhoaHoc.Controllers
             string? Difficulty,
             string? Keywords,
             string? AvatarUrl
+        );
+        public record UpdateAvatarRequest
+        (
+            string AvatarObjectKey
         );
     }
 }
