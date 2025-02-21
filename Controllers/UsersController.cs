@@ -41,6 +41,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         public record ConfirmEmailRequest(string Email, string Token);
         public record RefreshTokenRequest(string RefreshToken);
         public record RefreshTokenResponse(string AccessToken, string RefreshToken);
+        public record UserPagedResult(IEnumerable<User> Users, int TotalCount);
 
         // POST: /users/register
         [HttpPost("register")]
@@ -175,22 +176,45 @@ namespace Be_QuanLyKhoaHoc.Controllers
         // API: Get all users
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
         [HttpGet]
-        [ProducesResponseType(typeof(Result<IEnumerable<User>>), 200)]
+        [ProducesResponseType(typeof(Result<UserPagedResult>), 200)]
         [ProducesResponseType(typeof(object), 400)]
         [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(object), 403)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetUsers()
+        public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string options = null)
         {
             try
             {
-                var users = await _context.Users.ToListAsync();
+                if (page <= 0) page = 1;
+                if (pageSize <= 0) pageSize = 10;
+
+                // Xây dựng truy vấn với điều kiện tìm kiếm nếu có
+                var query = _context.Users.AsNoTracking()
+                    .Where(u => string.IsNullOrEmpty(options) ||
+                                EF.Functions.Like(u.FullName, $"%{options}%") ||
+                                EF.Functions.Like(u.UserName, $"%{options}%") ||
+                                EF.Functions.Like(u.Email, $"%{options}%") ||
+                                EF.Functions.Like(u.PhoneNumber, $"%{options}%"));
+
+                // Lấy tổng số bản ghi theo điều kiện tìm kiếm
+                var totalCount = await query.CountAsync();
+
+                // Lấy dữ liệu theo phân trang
+                var users = await query
+                    .OrderBy(u => u.Id)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
                 if (users == null || !users.Any())
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
                 }
-                return Ok(Result<IEnumerable<User>>.Success(users));
+
+                var result = new UserPagedResult(users, totalCount);
+
+                return Ok(Result<UserPagedResult>.Success(result));
             }
             catch (DbUpdateException dbEx)
             {
