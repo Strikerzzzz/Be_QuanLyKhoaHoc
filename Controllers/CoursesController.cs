@@ -81,19 +81,43 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // GET: api/Courses
         [HttpGet]
-        [ProducesResponseType(typeof(Result<object>), 200)]
+        [ProducesResponseType(typeof(Result<CoursePagedResult>), 200)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(object), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetCoursesForLecturer()
+        public async Task<IActionResult> GetCoursesForLecturer([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string options = null)
         {
             var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             try
             {
-                var courseDtos = await _context.Courses
-                    .AsNoTracking()
-                    .Where(c => c.LecturerId == lecturerId)
+                if (page <= 0) page = 1;
+                if (pageSize <= 0) pageSize = 10;
+
+                var query = _context.Courses.AsNoTracking()
+                    .Where(c => c.LecturerId == lecturerId &&
+                                (string.IsNullOrEmpty(options) ||
+                                 EF.Functions.Like(c.Title, $"%{options}%") ||
+                                 EF.Functions.Like(c.Description, $"%{options}%") ||
+                                 EF.Functions.Like(c.Keywords, $"%{options}%")));
+
+                var totalCount = await query.CountAsync();
+
+                if (totalCount == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
+                }
+
+                // Tính tổng số trang
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+                // Đảm bảo page không vượt quá tổng số trang
+                if (page > totalPages) page = totalPages;
+
+                var courses = await query
+                    .OrderBy(c => c.CourseId)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
                     .Select(c => new CourseDto(
                         c.CourseId,
                         c.Title,
@@ -102,16 +126,24 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         c.Difficulty,
                         c.Keywords,
                         c.AvatarUrl
-                        ))
+                    ))
                     .ToListAsync();
 
-                return Ok(Result<object>.Success(courseDtos));
+                if (!courses.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                var result = new CoursePagedResult(courses, totalCount);
+
+                return Ok(Result<CoursePagedResult>.Success(result));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
 
         // POST: api/Courses
         [HttpPost]
@@ -329,5 +361,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         (
             string AvatarObjectKey
         );
+        public record CoursePagedResult(IEnumerable<CourseDto> Courses, int TotalCount);
+
     }
 }

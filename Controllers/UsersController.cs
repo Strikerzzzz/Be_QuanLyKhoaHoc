@@ -200,6 +200,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 // Lấy tổng số bản ghi theo điều kiện tìm kiếm
                 var totalCount = await query.CountAsync();
 
+                if (totalCount == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
+                }
+
+                // Tính tổng số trang
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+                // Đảm bảo page không vượt quá tổng số trang
+                if (page > totalPages) page = totalPages;
+
                 // Lấy dữ liệu theo phân trang
                 var users = await query
                     .OrderBy(u => u.Id)

@@ -22,13 +22,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         [HttpGet("course/{courseId}")]
         [AllowAnonymous]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<LessonPagedResult>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
-
-        public async Task<IActionResult> GetLessonsByCourse(int courseId)
+        public async Task<IActionResult> GetLessonsByCourse(int courseId, int pageIndex = 1, int pageSize = 10)
         {
-
             try
             {
                 var course = await _context.Courses.FindAsync(courseId);
@@ -37,22 +35,36 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
                 }
 
+                var totalItems = await _context.Lessons.Where(l => l.CourseId == courseId).CountAsync();
+                if (totalItems == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có bài học nào trong khóa học này." }));
+                }
+
+                // Tính tổng số trang
+                int totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+                if (pageIndex > totalPages) pageIndex = totalPages;
                 var lessons = await _context.Lessons
                     .Where(l => l.CourseId == courseId)
-                    .Select(l => new
-                    {
+                    .OrderBy(l => l.LessonId)
+                    .Skip((pageIndex - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(l => new LessonDto(
                         l.LessonId,
                         l.Title
-                    })
+                    ))
                     .ToListAsync();
 
-                return Ok(Result<IEnumerable<object>>.Success(lessons));
+                var result = new LessonPagedResult(lessons, totalItems);
+
+                return Ok(Result<LessonPagedResult>.Success(result));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
 
         [HttpPost]
         [ProducesResponseType(typeof(Result<string>), 200)]
@@ -193,5 +205,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         public record CreateLessonRequest(int CourseId, string Title);
         public record UpdateLessonRequest(string Title);
+        public record LessonDto(
+             int LessonId,
+             string Title
+         );
+
+        public record LessonPagedResult(IEnumerable<LessonDto> Lessons, int TotalCount);
+
     }
 }
