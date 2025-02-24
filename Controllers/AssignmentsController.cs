@@ -7,6 +7,7 @@ using SampleProject.Common;
 using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Enums;
 using System.Linq;
+using Be_QuanLyKhoaHoc.DTO;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -50,8 +51,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     {
                         a.AssignmentId,
                         a.Title,
-                        a.Description
-                       
+                        a.Description,
+                        a.RandomMultipleChoiceCount
                     })
                     .SingleOrDefaultAsync();
 
@@ -68,10 +69,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-
         [HttpGet("{assignmentId}/questions")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<IEnumerable<QuestionPreviewDto>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
@@ -79,50 +79,67 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             try
             {
-                var assignmentExists = await _context.Assignments
+                var assignment = await _context.Assignments
                     .AsNoTracking()
-                    .AnyAsync(a => a.AssignmentId == assignmentId);
-                if (!assignmentExists)
+                    .FirstOrDefaultAsync(a => a.AssignmentId == assignmentId);
+
+                if (assignment == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài tập." }));
                 }
 
-                // Truy vấn cho MultipleChoiceQuestion
-                var multipleChoiceQuestions = await _context.Questions
+                int numberOfQuestions = assignment.RandomMultipleChoiceCount;
+
+                var groupedQuestions = await _context.Questions
                     .OfType<MultipleChoiceQuestion>()
                     .Where(q => q.AssignmentId == assignmentId)
-                    .OrderBy(q => q.CreatedAt)
-                    .Select(q => new
-                    {
-                        q.Id,
-                        q.Content,
-                        q.Type,
-                        q.CreatedAt,
-                        Choices = q.Choices,
-                        CorrectAnswerIndex = (int?)q.CorrectAnswerIndex, // ép kiểu về int?
-                        CorrectAnswer = (string)null
-                    })
+                    .GroupBy(q => q.AnswerGroupNumber)
                     .ToListAsync();
 
-                // Truy vấn cho FillInBlankQuestion
+                var selectedQuestions = new List<QuestionPreviewDto>();
+
+                if (groupedQuestions.Any())
+                {
+                    int questionsPerGroup = numberOfQuestions / groupedQuestions.Count;
+                    int remainingQuestions = numberOfQuestions % groupedQuestions.Count;
+
+                    foreach (var group in groupedQuestions)
+                    {
+                        int takeCount = questionsPerGroup + (remainingQuestions > 0 ? 1 : 0);
+                        remainingQuestions--;
+
+                        var randomQuestions = group.OrderBy(q => Guid.NewGuid()).Take(takeCount)
+                            .Select(q => new QuestionPreviewDto(
+                                q.Id,
+                                q.Content,
+                                q.Type,
+                                q.CreatedAt,
+                                q.Choices,
+                                q.CorrectAnswerIndex,
+                                null
+                            ))
+                            .ToList();
+
+                        selectedQuestions.AddRange(randomQuestions);
+                    }
+                }
+
                 var fillInBlankQuestions = await _context.Questions
                     .OfType<FillInBlankQuestion>()
                     .Where(q => q.AssignmentId == assignmentId)
                     .OrderBy(q => q.CreatedAt)
-                    .Select(q => new
-                    {
+                    .Select(q => new QuestionPreviewDto(
                         q.Id,
                         q.Content,
                         q.Type,
                         q.CreatedAt,
-                        Choices = (string)null,
-                        CorrectAnswerIndex = (int?)null,
-                        CorrectAnswer = q.CorrectAnswer
-                    })
+                        null,
+                        null,
+                        q.CorrectAnswer
+                    ))
                     .ToListAsync();
 
-                // Hợp nhất danh sách và sắp xếp theo CreatedAt
-                var questions = multipleChoiceQuestions
+                var questions = selectedQuestions
                     .Concat(fillInBlankQuestions)
                     .OrderBy(q => q.CreatedAt)
                     .ToList();
@@ -132,13 +149,14 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy câu hỏi cho bài tập này." }));
                 }
 
-                return Ok(Result<IEnumerable<object>>.Success(questions));
+                return Ok(Result<IEnumerable<QuestionPreviewDto>>.Success(questions));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
 
         // Tạo mới bài tập
         [HttpPost]
@@ -187,7 +205,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     Title = request.Title,
                     Description = request.Description,
-                    LessonId = request.LessonId
+                    LessonId = request.LessonId,
+                    RandomMultipleChoiceCount = request.RandomMultipleChoiceCount
                 };
 
                 await _context.Assignments.AddAsync(newAssignment);
@@ -244,6 +263,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(a => a.Title, request.Title)
                         .SetProperty(a => a.Description, request.Description)
+                        .SetProperty(a => a.RandomMultipleChoiceCount, request.RandomMultipleChoiceCount)
                     );
 
                 if (affectedRows > 0)
@@ -477,8 +497,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
 
 
-        public record CreateAssignmentRequest(int LessonId, string Title, string? Description);
-        public record UpdateAssignmentRequest(string Title, string? Description);
+        public record CreateAssignmentRequest(int LessonId, string Title, string? Description, int RandomMultipleChoiceCount);
+        public record UpdateAssignmentRequest(string Title, string? Description, int RandomMultipleChoiceCount);
 
         public record SubmitAssignmentRequest(float Score);
     }

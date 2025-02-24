@@ -6,6 +6,7 @@ using Be_QuanLyKhoaHoc.Identity.Entities;
 using SampleProject.Common;
 using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Enums;
+using Be_QuanLyKhoaHoc.DTO;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -42,7 +43,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var exam = await _context.Exams
                     .AsNoTracking()
                     .Where(e => e.CourseId == courseId)
-                    .Select(e => new { e.ExamId, e.Title, e.Description })
+                    .Select(e => new { e.ExamId, e.Title, e.Description, e.RandomMultipleChoiceCount })
                     .SingleOrDefaultAsync();
 
                 if (exam == null)
@@ -58,10 +59,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-
         [HttpGet("{examId}/questions")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<IEnumerable<QuestionPreviewDto>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
@@ -70,50 +70,70 @@ namespace Be_QuanLyKhoaHoc.Controllers
             try
             {
                 // Kiểm tra sự tồn tại của bài kiểm tra
-                var examExists = await _context.Exams
+                var exam = await _context.Exams
                     .AsNoTracking()
-                    .AnyAsync(e => e.ExamId == examId);
-                if (!examExists)
+                    .FirstOrDefaultAsync(e => e.ExamId == examId);
+
+                if (exam == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
 
-                // Truy vấn cho câu hỏi kiểu MultipleChoiceQuestion
-                var multipleChoiceQuestions = await _context.Questions
+                int numberOfQuestions = exam.RandomMultipleChoiceCount;
+
+                // Nhóm các câu hỏi trắc nghiệm theo dạng câu
+                var groupedQuestions = await _context.Questions
                     .OfType<MultipleChoiceQuestion>()
                     .Where(q => q.ExamId == examId)
-                    .OrderBy(q => q.CreatedAt)
-                    .Select(q => new
-                    {
-                        q.Id,
-                        q.Content,
-                        q.Type,
-                        q.CreatedAt,
-                        Choices = q.Choices,
-                        CorrectAnswerIndex = (int?)q.CorrectAnswerIndex,
-                        CorrectAnswer = (string)null
-                    })
+                    .GroupBy(q => q.AnswerGroupNumber)
                     .ToListAsync();
 
-                // Truy vấn cho câu hỏi kiểu FillInBlankQuestion
+                var selectedQuestions = new List<QuestionPreviewDto>();
+
+                if (groupedQuestions.Any())
+                {
+                    int questionsPerGroup = numberOfQuestions / groupedQuestions.Count;
+                    int remainingQuestions = numberOfQuestions % groupedQuestions.Count;
+
+                    foreach (var group in groupedQuestions)
+                    {
+                        int takeCount = questionsPerGroup + (remainingQuestions > 0 ? 1 : 0);
+                        remainingQuestions--;
+
+                        var randomQuestions = group.OrderBy(q => Guid.NewGuid()).Take(takeCount)
+                            .Select(q => new QuestionPreviewDto(
+                                q.Id,
+                                q.Content,
+                                q.Type,
+                                q.CreatedAt,
+                                q.Choices,
+                                q.CorrectAnswerIndex,
+                                null
+                            ))
+                            .ToList();
+
+                        selectedQuestions.AddRange(randomQuestions);
+                    }
+                }
+
+                // Truy vấn câu hỏi điền khuyết
                 var fillInBlankQuestions = await _context.Questions
                     .OfType<FillInBlankQuestion>()
                     .Where(q => q.ExamId == examId)
                     .OrderBy(q => q.CreatedAt)
-                    .Select(q => new
-                    {
+                    .Select(q => new QuestionPreviewDto(
                         q.Id,
                         q.Content,
                         q.Type,
                         q.CreatedAt,
-                        Choices = (string)null,
-                        CorrectAnswerIndex = (int?)null,
-                        CorrectAnswer = q.CorrectAnswer
-                    })
+                        null,
+                        null,
+                        q.CorrectAnswer
+                    ))
                     .ToListAsync();
 
                 // Hợp nhất danh sách và sắp xếp theo CreatedAt
-                var questions = multipleChoiceQuestions
+                var questions = selectedQuestions
                     .Concat(fillInBlankQuestions)
                     .OrderBy(q => q.CreatedAt)
                     .ToList();
@@ -123,13 +143,14 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy câu hỏi cho bài kiểm tra này." }));
                 }
 
-                return Ok(Result<IEnumerable<object>>.Success(questions));
+                return Ok(Result<IEnumerable<QuestionPreviewDto>>.Success(questions));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
 
         // Tạo mới bài kiểm tra
         [HttpPost]
@@ -168,7 +189,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     Title = request.Title,
                     Description = request.Description,
-                    CourseId = request.CourseId
+                    CourseId = request.CourseId,
+                    RandomMultipleChoiceCount = request.RandomMultipleChoiceCount
                 };
 
                 await _context.Exams.AddAsync(newExam);
@@ -225,6 +247,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(e => e.Title, request.Title)
                         .SetProperty(e => e.Description, request.Description)
+                        .SetProperty(e => e.RandomMultipleChoiceCount, request.RandomMultipleChoiceCount)
                     );
 
                 if (affectedRows > 0)
@@ -299,8 +322,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        public record CreateExamRequest(int CourseId, string Title, string? Description);
-        public record UpdateExamRequest(string Title, string? Description);
+        public record CreateExamRequest(int CourseId, string Title, string? Description, int RandomMultipleChoiceCount);
+        public record UpdateExamRequest(string Title, string? Description, int RandomMultipleChoiceCount);
 
 
 

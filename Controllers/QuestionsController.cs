@@ -33,12 +33,30 @@ namespace Be_QuanLyKhoaHoc.Controllers
             [param: Required]
             QuestionType Type,
 
+            int? AnswerGroupNumber,
             string? Choices,
             int? CorrectAnswerIndex,
             string? CorrectAnswer,
             int? AssignmentId,
             int? ExamId
         );
+        public record MultipleChoiceQuestionImportDto(
+        [param: Required]
+        [param: MaxLength(3000)]
+        string Content,
+
+        [param: Required]
+        string Choices,
+
+        [param: Required]
+        int CorrectAnswerIndex,
+
+        [param: Required]
+        int AnswerGroupNumber,
+
+        int? AssignmentId,
+        int? ExamId
+    );
 
         [HttpGet("{entityType}/{entityId}/questions/{questionType:int}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
@@ -118,6 +136,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                             Content = dto.Content,
                             Choices = dto.Choices,
                             CorrectAnswerIndex = dto.CorrectAnswerIndex.Value,
+                            AnswerGroupNumber = dto.AnswerGroupNumber ?? 0,
                             AssignmentId = dto.AssignmentId,
                             ExamId = dto.ExamId
                         };
@@ -150,6 +169,35 @@ namespace Be_QuanLyKhoaHoc.Controllers
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
+        }
+
+        [HttpPost("bulk-import/multiple-choice")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [ProducesResponseType(typeof(Result<string>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 400)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> BulkImportMultipleChoiceQuestions([FromBody] IEnumerable<MultipleChoiceQuestionImportDto> dtos)
+        {
+            if (dtos == null || !dtos.Any())
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Không có dữ liệu import." }));
+            }
+
+            // Chuyển đổi danh sách DTO thành các thực thể MultipleChoiceQuestion
+            var mcqEntities = dtos.Select(dto => new MultipleChoiceQuestion
+            {
+                Content = dto.Content,
+                Choices = dto.Choices,
+                CorrectAnswerIndex = dto.CorrectAnswerIndex,
+                AnswerGroupNumber = dto.AnswerGroupNumber,
+                AssignmentId = dto.AssignmentId,
+                ExamId = dto.ExamId
+            }).ToList();
+
+            _context.Questions.AddRange(mcqEntities);
+            await _context.SaveChangesAsync();
+
+            return Ok(Result<string>.Success("Import câu hỏi trắc nghiệm thành công."));
         }
 
         [HttpPut("{id}")]
@@ -191,6 +239,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                             }
                             mcq.Choices = dto.Choices;
                             mcq.CorrectAnswerIndex = dto.CorrectAnswerIndex.Value;
+                            mcq.AnswerGroupNumber = dto.AnswerGroupNumber ?? 0;
                         }
                         break;
 

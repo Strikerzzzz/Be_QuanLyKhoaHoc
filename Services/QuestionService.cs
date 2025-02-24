@@ -37,7 +37,8 @@ namespace Be_QuanLyKhoaHoc.Services
                     q.CreatedAt,
                     Choices = q.Choices,
                     CorrectAnswerIndex = (int?)q.CorrectAnswerIndex,
-                    CorrectAnswer = (string)null
+                    CorrectAnswer = (string)null,
+                    AnswerGroupNumber = (int?)q.AnswerGroupNumber,
                 })
                 .ToListAsync<object>();
         }
