@@ -78,6 +78,63 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
+        [HttpPost("upload")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [ProducesResponseType(typeof(Result<object>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 400)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> UploadFile(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(Result<object>.Failure(new[] { "File không hợp lệ." }));
+            }
+
+            // Danh sách định dạng ảnh và video hợp lệ
+            var allowedExtensions = new HashSet<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".mp4", ".mov", ".avi", ".mkv" };
+            var allowedContentTypes = new HashSet<string> {
+                    "image/jpeg", "image/png", "image/gif", "image/bmp", "image/webp",
+                    "video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"
+                };
+
+            // Kiểm tra phần mở rộng của file
+            string fileExtension = Path.GetExtension(file.FileName)?.ToLower();
+            if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Định dạng file không hợp lệ. Chỉ chấp nhận ảnh (.jpg, .jpeg, .png, .gif, .bmp, .webp) hoặc video (.mp4, .mov, .avi, .mkv)." }));
+            }
+
+            // Kiểm tra contentType
+            if (!allowedContentTypes.Contains(file.ContentType.ToLower()))
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Loại tệp không hợp lệ. Chỉ chấp nhận ảnh và video." }));
+            }
+
+            try
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(fileStream);
+                }
+
+                var fileUrl = $"/uploads/{uniqueFileName}"; // Trả về URL file
+
+                return Ok(Result<object>.Success(new { url = fileUrl }));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
 
     }
 }

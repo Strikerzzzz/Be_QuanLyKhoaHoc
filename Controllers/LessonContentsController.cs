@@ -39,7 +39,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         lc.Content))
                     .ToListAsync();
 
-               
+
 
                 return Ok(Result<IEnumerable<ContentDto>>.Success(contentDtos));
             }
@@ -110,6 +110,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy nội dung bài học." }));
                 }
 
+                // Nếu URL media mới khác URL cũ => xóa file cũ
+                if (!string.IsNullOrEmpty(lessonContent.MediaUrl) && lessonContent.MediaUrl != request.MediaUrl)
+                {
+                    DeleteFileIfExists(lessonContent.MediaUrl);
+                }
                 lessonContent.MediaType = request.MediaType;
                 lessonContent.MediaUrl = request.MediaUrl;
                 lessonContent.Content = request.Content;
@@ -144,6 +149,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy nội dung bài học." }));
                 }
+                DeleteFileIfExists(lessonContent.MediaUrl);
 
                 _context.LessonContents.Remove(lessonContent);
                 await _context.SaveChangesAsync();
@@ -153,6 +159,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
+        private void DeleteFileIfExists(string? filePath)
+        {
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                string fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", filePath.TrimStart('/'));
+                if (System.IO.File.Exists(fullPath))
+                {
+                    System.IO.File.Delete(fullPath);
+                }
             }
         }
 
