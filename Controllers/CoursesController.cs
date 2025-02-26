@@ -50,17 +50,20 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
-        // GET: api/Courses/public  
-        [HttpGet("public")]
+
+        // GET: api/Courses/details/{id}
+        [HttpGet("details/{id}")]
         [AllowAnonymous]
-        [ProducesResponseType(typeof(Result<object>), 200)]
+        [ProducesResponseType(typeof(Result<CourseDto>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetCoursesForUser()
+        public async Task<IActionResult> GetCourseDetailsById(int id)
         {
             try
             {
-                var courseDtos = await _context.Courses
+                var course = await _context.Courses
                     .AsNoTracking()
+                    .Where(c => c.CourseId == id)
                     .Select(c => new CourseDto(
                         c.CourseId,
                         c.Title,
@@ -68,16 +71,78 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         c.Price,
                         c.Difficulty,
                         c.Keywords,
-                        c.AvatarUrl))
-                    .ToListAsync();
+                        c.AvatarUrl
+                    ))
+                    .FirstOrDefaultAsync();
 
-                return Ok(Result<object>.Success(courseDtos));
+                if (course == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                return Ok(Result<CourseDto>.Success(course));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
+
+        // GET: api/Courses/public
+        [HttpGet("public")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(Result<CoursePagedResult>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> GetCoursesForUser(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string options = null)
+        {
+            try
+            {
+                if (page <= 0) page = 1;
+                if (pageSize <= 0) pageSize = 10;
+
+                var query = _context.Courses.AsNoTracking()
+                    .Where(c => string.IsNullOrEmpty(options) ||
+                                EF.Functions.Like(c.Title, $"%{options}%") ||
+                                EF.Functions.Like(c.Description, $"%{options}%") ||
+                                EF.Functions.Like(c.Keywords, $"%{options}%"));
+
+                var totalCount = await query.CountAsync();
+                if (totalCount == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+                if (page > totalPages) page = totalPages;
+
+                var courses = await query
+                    .OrderBy(c => c.CourseId)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(c => new CourseDto(
+                        c.CourseId,
+                        c.Title,
+                        c.Description,
+                        c.Price,
+                        c.Difficulty,
+                        c.Keywords,
+                        c.AvatarUrl
+                    ))
+                    .ToListAsync();
+
+                var result = new CoursePagedResult(courses, totalCount);
+                return Ok(Result<CoursePagedResult>.Success(result));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
+
 
         // GET: api/Courses
         [HttpGet]
