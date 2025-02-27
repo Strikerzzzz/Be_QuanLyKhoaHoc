@@ -27,5 +27,7 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         public User? Lecturer { get; set; }
 
         public Exam Exam { get; set; } = null!;
+
+        public ICollection<Lesson> Lessons { get; set; } = new List<Lesson>();
     }
 }

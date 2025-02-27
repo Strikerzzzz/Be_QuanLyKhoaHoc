@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Be_QuanLyKhoaHoc.Identity.Entities
 {
@@ -7,7 +7,9 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
     {
         [Key]
         public int ProgressId { get; set; }
-        public string? StudentId { get; set; }
+
+        [Required]
+        public string StudentId { get; set; } = string.Empty;
 
         [ForeignKey(nameof(StudentId))]
         public User? Student { get; set; }
@@ -17,18 +19,13 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         [ForeignKey(nameof(CourseId))]
         public Course? Course { get; set; }
 
-        [Range(0, int.MaxValue)]
-        public int CompletedLessons { get; set; } = 0;
-
         [Range(0, 100)]
         public float CompletionRate { get; set; } = 0;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        public float TotalAssignmentScore { get; set; } = 0;
 
-        public float TotalExamScore { get; set; } = 0;
+        public bool IsCompleted { get; set; } = false;
     }
 }

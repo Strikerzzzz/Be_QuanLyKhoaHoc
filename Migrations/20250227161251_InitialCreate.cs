@@ -187,6 +187,32 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "RefreshTokens",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Token = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Expires = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Created = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedByIp = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Revoked = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    RevokedByIp = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    ReplacedByToken = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RefreshTokens", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RefreshTokens_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Exams",
                 columns: table => new
                 {
@@ -194,7 +220,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     CourseId = table.Column<int>(type: "int", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RandomMultipleChoiceCount = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -233,14 +260,12 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 {
                     ProgressId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    StudentId = table.Column<string>(type: "nvarchar(450)", nullable: true),
+                    StudentId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     CourseId = table.Column<int>(type: "int", nullable: true),
-                    CompletedLessons = table.Column<int>(type: "int", nullable: false),
                     CompletionRate = table.Column<float>(type: "real", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    TotalAssignmentScore = table.Column<float>(type: "real", nullable: false),
-                    TotalExamScore = table.Column<float>(type: "real", nullable: false)
+                    IsCompleted = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -249,7 +274,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         name: "FK_Progresses_AspNetUsers_StudentId",
                         column: x => x.StudentId,
                         principalTable: "AspNetUsers",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_Progresses_Courses_CourseId",
                         column: x => x.CourseId,
@@ -292,7 +318,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     LessonId = table.Column<int>(type: "int", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RandomMultipleChoiceCount = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -303,6 +330,32 @@ namespace Be_QuanLyKhoaHoc.Migrations
                         principalTable: "Lessons",
                         principalColumn: "LessonId",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CompletedLessons",
+                columns: table => new
+                {
+                    CompletedLessonId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    StudentId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    LessonId = table.Column<int>(type: "int", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CompletedLessons", x => x.CompletedLessonId);
+                    table.ForeignKey(
+                        name: "FK_CompletedLessons_AspNetUsers_StudentId",
+                        column: x => x.StudentId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CompletedLessons_Lessons_LessonId",
+                        column: x => x.LessonId,
+                        principalTable: "Lessons",
+                        principalColumn: "LessonId");
                 });
 
             migrationBuilder.CreateTable(
@@ -368,7 +421,8 @@ namespace Be_QuanLyKhoaHoc.Migrations
                     Discriminator = table.Column<string>(type: "nvarchar(34)", maxLength: 34, nullable: false),
                     CorrectAnswer = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     Choices = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CorrectAnswerIndex = table.Column<int>(type: "int", nullable: true)
+                    CorrectAnswerIndex = table.Column<int>(type: "int", nullable: true),
+                    AnswerGroupNumber = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -398,7 +452,7 @@ namespace Be_QuanLyKhoaHoc.Migrations
             migrationBuilder.InsertData(
                 table: "AspNetUsers",
                 columns: new[] { "Id", "AccessFailedCount", "AvatarUrl", "ConcurrencyStamp", "CreatedAt", "Email", "EmailConfirmed", "FullName", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PhoneNumber", "PhoneNumberConfirmed", "SecurityStamp", "TwoFactorEnabled", "UserName" },
-                values: new object[] { "a0d9ec33-7b25-4f40-9f4f-1e4d0f2e9842", 0, null, "ff2dc180-1da5-47b6-9911-0ff2812597f9", new DateTime(2025, 2, 10, 16, 45, 29, 909, DateTimeKind.Utc).AddTicks(9571), "admin@ntt.com", true, "Admin", false, null, "ADMIN@NTT.COM", "ADMIN", "AQAAAAIAAYagAAAAEEr52sH41BXI5uOK00BwMshuKFRP8D0V5KKy3YzCvDb2CSDTmWTVbae5C2zhABfpWA==", null, false, "d4d4d4d4-d4d4-4d4d-d4d4-d4d4d4d4d4d4", false, "admin" });
+                values: new object[] { "a0d9ec33-7b25-4f40-9f4f-1e4d0f2e9842", 0, null, "908a1854-30cd-4996-a42d-7a627c01dc69", new DateTime(2025, 2, 27, 16, 12, 51, 122, DateTimeKind.Utc).AddTicks(8888), "admin@ntt.com", true, "Admin", false, null, "ADMIN@NTT.COM", "ADMIN", "AQAAAAIAAYagAAAAEByJ0d+P87ZxmbOkspwVmWKZX/n0V2FHJP0Qn2LxhIy1SgCUNdMclHzjgc9/Vt6bKA==", null, false, "d4d4d4d4-d4d4-4d4d-d4d4-d4d4d4d4d4d4", false, "admin" });
 
             migrationBuilder.InsertData(
                 table: "AspNetUserRoles",
@@ -466,6 +520,16 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_CompletedLessons_LessonId",
+                table: "CompletedLessons",
+                column: "LessonId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CompletedLessons_StudentId",
+                table: "CompletedLessons",
+                column: "StudentId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Courses_LecturerId",
                 table: "Courses",
                 column: "LecturerId");
@@ -515,6 +579,11 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 name: "IX_Questions_ExamId",
                 table: "Questions",
                 column: "ExamId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RefreshTokens_UserId",
+                table: "RefreshTokens",
+                column: "UserId");
         }
 
         /// <inheritdoc />
@@ -539,6 +608,9 @@ namespace Be_QuanLyKhoaHoc.Migrations
                 name: "AssignmentResults");
 
             migrationBuilder.DropTable(
+                name: "CompletedLessons");
+
+            migrationBuilder.DropTable(
                 name: "ExamResults");
 
             migrationBuilder.DropTable(
@@ -549,6 +621,9 @@ namespace Be_QuanLyKhoaHoc.Migrations
 
             migrationBuilder.DropTable(
                 name: "Questions");
+
+            migrationBuilder.DropTable(
+                name: "RefreshTokens");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
