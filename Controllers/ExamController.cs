@@ -327,20 +327,18 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
 
 
-        // Người học nộp kết quả bài kiểm tra
         [HttpPost("{examId}/submit")]
         [ProducesResponseType(typeof(Result<string>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         public async Task<IActionResult> SubmitExam(int examId, [FromBody] SubmitExamRequest request)
         {
             if (!ModelState.IsValid)
             {
-                var errors = ModelState.Values
-                                       .SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
-                                       .ToArray();
+                var errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)).ToArray();
                 return BadRequest(Result<object>.Failure(errors));
             }
 
@@ -350,37 +348,63 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return Unauthorized(Result<object>.Failure(new[] { "Thông tin người học không hợp lệ." }));
             }
 
+            if (request.Score < 0 || request.Score > 100)
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Điểm không hợp lệ (phải từ 0 đến 100)." }));
+            }
+
             try
             {
-                var exam = await _context.Exams.FindAsync(examId);
-                if (exam == null)
+                var examData = await _context.Exams
+                    .Where(e => e.ExamId == examId)
+                    .Select(e => new
+                    {
+                        Exam = e,
+                        ExistingResult = _context.ExamResults
+                            .FirstOrDefault(er => er.ExamId == examId && er.StudentId == studentId)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (examData?.Exam == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
                 }
-                var hasSubmitted = await _context.ExamResults
-                    .AnyAsync(er => er.ExamId == examId && er.StudentId == studentId);
-                if (hasSubmitted)
+
+                var existingResult = examData.ExistingResult;
+
+                if (existingResult == null)
                 {
-                    return BadRequest(Result<object>.Failure(new[] { "Bạn đã nộp bài kiểm tra này rồi." }));
+                    // Nếu chưa nộp bài, thêm mới
+                    var newResult = new ExamResult
+                    {
+                        StudentId = studentId,
+                        ExamId = examId,
+                        Score = request.Score,
+                        SubmissionTime = DateTime.UtcNow
+                    };
+
+                    await _context.ExamResults.AddAsync(newResult);
+                    await _context.SaveChangesAsync();
+                    return Ok(Result<string>.Success("Nộp bài kiểm tra thành công!"));
                 }
-                var examResult = new ExamResult
+                else if (request.Score > existingResult.Score)
                 {
-                    StudentId = studentId,
-                    ExamId = examId,
-                    Score = request.Score,
-                    SubmissionTime = DateTime.UtcNow
-                };
+                    // Cập nhật nếu điểm mới cao hơn
+                    existingResult.Score = request.Score;
+                    existingResult.SubmissionTime = DateTime.UtcNow;
 
-                await _context.ExamResults.AddAsync(examResult);
-                await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync();
+                    return Ok(Result<string>.Success("Cập nhật điểm bài kiểm tra thành công!"));
+                }
 
-                return Ok(Result<string>.Success("Nộp bài kiểm tra thành công!"));
+                return Ok(Result<string>.Success("Điểm không thay đổi do điểm cũ cao hơn hoặc bằng."));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
             }
         }
+
 
         // Người học xem kết quả bài kiểm tra của mình
         [HttpGet("{examId}/result")]

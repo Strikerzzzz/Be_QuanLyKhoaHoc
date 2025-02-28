@@ -38,7 +38,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 var query = _context.Progresses.AsNoTracking()
                     .Where(p => p.CourseId == courseId &&
                                 (string.IsNullOrEmpty(search) ||
-                                 EF.Functions.Like(p.StudentId, $"%{search}%") ||
                                  EF.Functions.Like(p.Student.FullName, $"%{search}%") ||
                                  EF.Functions.Like(p.Student.Email, $"%{search}%") ||
                                  EF.Functions.Like(p.Student.UserName, $"%{search}%")));
@@ -169,6 +168,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
 
         }
+
         [HttpPut("update-lesson-progress")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [ProducesResponseType(typeof(Result<string>), 200)]
@@ -217,8 +217,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return BadRequest(Result<object>.Failure(new[] { "Khóa học không có bài giảng nào." }));
 
             var completedLessons = await _context.CompletedLessons
-                .Where(cl => cl.StudentId == studentId && _context.Lessons.Any(l => l.LessonId == cl.LessonId && l.CourseId == courseId))
+                .Join(_context.Lessons,
+                      cl => cl.LessonId,
+                      l => l.LessonId,
+                      (cl, l) => new { cl, l })
+                .Where(x => x.cl.StudentId == studentId && x.l.CourseId == courseId)
                 .CountAsync();
+
 
             progress.CompletionRate = (float)completedLessons / totalLessons * 100;
             progress.IsCompleted = (completedLessons == totalLessons);
@@ -229,119 +234,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
             return Ok(Result<string>.Success("Cập nhật tiến độ thành công."));
         }
 
-        [HttpPost("add-assignment-result")]
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<string>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 400)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
-        [ProducesResponseType(typeof(object), 403)]
-        [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> AddAssignmentResult(int lessonId, int assignmentId, float score)
-        {
-            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (studentId == null)
-                return Unauthorized(Result<object>.Failure(new[] { "Không xác định được học viên." }));
-
-            if (score < 0 || score > 100)
-                return BadRequest(Result<object>.Failure(new[] { "Điểm không hợp lệ." }));
-
-            // Kiểm tra bài tập có thuộc bài học không
-            var assignment = await _context.Assignments
-                .Include(a => a.Lesson) // Lấy luôn Lesson để xác định CourseId
-                .FirstOrDefaultAsync(a => a.AssignmentId == assignmentId && a.LessonId == lessonId);
-
-            if (assignment == null)
-                return BadRequest(Result<object>.Failure(new[] { "Bài tập không tồn tại trong bài học." }));
-
-            // Kiểm tra xem đã có điểm chưa
-            var existingResult = await _context.AssignmentResults
-                .FirstOrDefaultAsync(ar => ar.StudentId == studentId && ar.AssignmentId == assignmentId);
-
-            if (existingResult == null)
-            {
-                // Chưa có điểm, thêm mới
-                var newResult = new AssignmentResult
-                {
-                    StudentId = studentId,
-                    AssignmentId = assignmentId,
-                    Score = score,
-                    SubmissionTime = DateTime.UtcNow
-                };
-                _context.AssignmentResults.Add(newResult);
-            }
-            else if (existingResult.Score < score)
-            {
-                // Ghi đè điểm mới nếu cao hơn
-                existingResult.Score = score;
-                existingResult.SubmissionTime = DateTime.UtcNow;
-            }
-            else
-            {
-                return Ok(Result<string>.Success("Điểm không thay đổi do điểm cũ cao hơn hoặc bằng."));
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(Result<string>.Success("Thêm điểm bài tập thành công."));
-        }
-
-        [HttpPost("add-exam-result")]
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<string>), 200)]
-        [ProducesResponseType(typeof(Result<object>), 400)]
-        [ProducesResponseType(typeof(Result<object>), 401)]
-        [ProducesResponseType(typeof(object), 403)]
-        [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> AddExamResult(int courseId, int examId, float score)
-        {
-            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (studentId == null)
-                return Unauthorized(Result<object>.Failure(new[] { "Không xác định được học viên." }));
-
-            if (score < 0 || score > 100)
-                return BadRequest(Result<object>.Failure(new[] { "Điểm không hợp lệ." }));
-
-            // Kiểm tra bài thi có thuộc khóa học không
-            var exam = await _context.Exams
-                .FirstOrDefaultAsync(e => e.ExamId == examId && e.CourseId == courseId);
-
-            if (exam == null)
-                return BadRequest(Result<object>.Failure(new[] { "Bài thi không tồn tại trong khóa học." }));
-
-            // Kiểm tra xem đã có điểm chưa
-            var existingResult = await _context.ExamResults
-                .FirstOrDefaultAsync(er => er.StudentId == studentId && er.ExamId == examId);
-
-            if (existingResult == null)
-            {
-                // Chưa có điểm, thêm mới
-                var newResult = new ExamResult
-                {
-                    StudentId = studentId,
-                    ExamId = examId,
-                    Score = score,
-                    SubmissionTime = DateTime.UtcNow
-                };
-                _context.ExamResults.Add(newResult);
-            }
-            else if (existingResult.Score < score)
-            {
-                // Ghi đè điểm mới nếu cao hơn
-                existingResult.Score = score;
-                existingResult.SubmissionTime = DateTime.UtcNow;
-            }
-            else
-            {
-                return Ok(Result<string>.Success("Điểm không thay đổi do điểm cũ cao hơn hoặc bằng."));
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(Result<string>.Success("Thêm điểm bài thi thành công."));
-        }
 
         [HttpDelete("delete/{studentId}/{courseId}")]
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 401)]

@@ -21,7 +21,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // GET: api/LessonContents/{lessonId}
         [HttpGet("{lessonId}")]
-        [AllowAnonymous]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [ProducesResponseType(typeof(Result<IEnumerable<ContentDto>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> GetLessonContentsByLessonId(int lessonId)
@@ -38,8 +38,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         lc.MediaUrl,
                         lc.Content))
                     .ToListAsync();
-
-
 
                 return Ok(Result<IEnumerable<ContentDto>>.Success(contentDtos));
             }

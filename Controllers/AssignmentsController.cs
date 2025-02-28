@@ -343,16 +343,14 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
-        [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> SubmitAssignment(int assignmentId, [FromBody] SubmitAssignmentRequest request)
         {
             if (!ModelState.IsValid)
             {
-                var errors = ModelState.Values
-                                       .SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
-                                       .ToArray();
+                var errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage)).ToArray();
                 return BadRequest(Result<object>.Failure(errors));
             }
 
@@ -362,40 +360,64 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return Unauthorized(Result<object>.Failure(new[] { "Thông tin người học không hợp lệ." }));
             }
 
+            if (request.Score < 0 || request.Score > 100)
+            {
+                return BadRequest(Result<object>.Failure(new[] { "Điểm không hợp lệ (phải từ 0 đến 100)." }));
+            }
+
             try
             {
-                var assignment = await _context.Assignments
-                                               .AsNoTracking()
-                                               .FirstOrDefaultAsync(a => a.AssignmentId == assignmentId);
-                if (assignment == null)
+                // Truy vấn đồng thời cả Assignment và điểm đã nộp trước đó (nếu có)
+                var assignmentData = await _context.Assignments
+                    .Where(a => a.AssignmentId == assignmentId)
+                    .Select(a => new
+                    {
+                        Assignment = a,
+                        ExistingResult = _context.AssignmentResults
+                            .FirstOrDefault(ar => ar.AssignmentId == assignmentId && ar.StudentId == studentId)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (assignmentData?.Assignment == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài tập." }));
                 }
-                var hasSubmitted = await _context.AssignmentResults
-                    .AnyAsync(ar => ar.AssignmentId == assignmentId && ar.StudentId == studentId);
-                if (hasSubmitted)
+
+                var existingResult = assignmentData.ExistingResult;
+
+                if (existingResult == null)
                 {
-                    return BadRequest(Result<object>.Failure(new[] { "Bạn đã nộp bài tập này rồi." }));
+                    // Chưa nộp, thêm mới
+                    var newResult = new AssignmentResult
+                    {
+                        StudentId = studentId,
+                        AssignmentId = assignmentId,
+                        Score = request.Score,
+                        SubmissionTime = DateTime.UtcNow
+                    };
+
+                    await _context.AssignmentResults.AddAsync(newResult);
+                    await _context.SaveChangesAsync();
+                    return Ok(Result<string>.Success("Nộp bài tập thành công!"));
+                }
+                else if (request.Score > existingResult.Score)
+                {
+                    // Cập nhật nếu điểm mới cao hơn
+                    existingResult.Score = request.Score;
+                    existingResult.SubmissionTime = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync();
+                    return Ok(Result<string>.Success("Cập nhật điểm thành công!"));
                 }
 
-                var assignmentResult = new AssignmentResult
-                {
-                    StudentId = studentId,
-                    AssignmentId = assignmentId,
-                    Score = request.Score,
-                    SubmissionTime = DateTime.UtcNow
-                };
-
-                await _context.AssignmentResults.AddAsync(assignmentResult);
-                await _context.SaveChangesAsync();
-
-                return Ok(Result<string>.Success("Nộp bài tập thành công!"));
+                return Ok(Result<string>.Success("Điểm không thay đổi do điểm cũ cao hơn hoặc bằng."));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
             }
         }
+
 
         [HttpGet("{assignmentId}/result")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
