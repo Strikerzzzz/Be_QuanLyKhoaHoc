@@ -286,7 +286,56 @@ namespace Be_QuanLyKhoaHoc.Controllers
             return Ok(Result<string>.Success("Xóa tiến độ học viên và các kết quả liên quan thành công."));
         }
 
+        [HttpGet("course/{courseId}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
+        [ProducesResponseType(typeof(Result<List<LessonLearnDto>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 403)]
+        public async Task<IActionResult> GetLessonsByCourse(int courseId)
+        {
+            try
+            {
+                // Lấy userId từ token JWT
+                var userId= User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(Result<object>.Failure(new[] { "Không thể xác định người dùng." }));
+                }
 
+                // Kiểm tra xem khóa học có tồn tại không
+                var course = await _context.Courses.FindAsync(courseId);
+                if (course == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                // Lấy danh sách bài học của khóa học và kiểm tra trạng thái hoàn thành
+                var lessons = await _context.Lessons
+                    .Where(l => l.CourseId == courseId)
+                    .OrderBy(l => l.LessonId)
+                    .Select(l => new LessonLearnDto(
+                        l.LessonId,
+                        l.Title,
+                        _context.CompletedLessons.Any(cl => cl.LessonId == l.LessonId && cl.StudentId == userId)
+                    ))
+                    .ToListAsync();
+
+                // Kiểm tra xem có bài học nào không
+                if (lessons.Count == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có bài học nào trong khóa học này." }));
+                }
+
+                // Trả về danh sách bài học
+                return Ok(Result<List<LessonLearnDto>>.Success(lessons));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
     }
     public record CreateProgressRequest([Required] int CourseId);
 
@@ -298,6 +347,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
         bool IsCompleted,
         DateTime UpdatedAt
     );
+
+    public record LessonLearnDto(
+             int LessonId,
+             string Title,
+            bool Completed
+         );
     public record ProgressPagedResult(IEnumerable<ProgressDto> Progresses, int TotalCount);
 
 
