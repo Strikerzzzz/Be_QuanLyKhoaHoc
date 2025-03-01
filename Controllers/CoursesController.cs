@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using SampleProject.Common;
 using System.Text.Json.Serialization;
+using Be_QuanLyKhoaHoc.Services;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -15,10 +16,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
     public class CoursesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly S3Service _s3Service;
 
-        public CoursesController(ApplicationDbContext context)
+        public CoursesController(ApplicationDbContext context, S3Service s3Service)
         {
             _context = context;
+            _s3Service = s3Service;
         }
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(Result<object>), 200)]
@@ -335,6 +338,15 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xoá khóa học này." }));
                 }
 
+                if (!string.IsNullOrEmpty(course.AvatarUrl))
+                {
+                    string objectKey = ExtractS3ObjectKey(course.AvatarUrl);
+                    if (!string.IsNullOrEmpty(objectKey))
+                    {
+                        await _s3Service.DeleteS3ObjectAsync(objectKey);
+                    }
+                }
+
                 _context.Courses.Remove(course);
                 await _context.SaveChangesAsync();
 
@@ -428,5 +440,24 @@ namespace Be_QuanLyKhoaHoc.Controllers
         );
         public record CoursePagedResult(IEnumerable<CourseDto> Courses, int TotalCount);
 
+        private string ExtractS3ObjectKey(string url)
+        {
+            try
+            {
+                Uri uri = new Uri(url);
+                string path = uri.AbsolutePath;
+
+                if (string.IsNullOrEmpty(path) || path == "/")
+                {
+                    return string.Empty;
+                }
+
+                return path.TrimStart('/');
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
+        }
     }
 }
