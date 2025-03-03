@@ -1,5 +1,6 @@
 ﻿using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Identity.Entities;
+using Be_QuanLyKhoaHoc.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +15,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
     public class LessonContentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        public LessonContentsController(ApplicationDbContext context)
+        private readonly S3Service _s3Service;
+        public LessonContentsController(ApplicationDbContext context, S3Service s3Service)
         {
             _context = context;
+            _s3Service = s3Service;
         }
 
         // GET: api/LessonContents/{lessonId}
@@ -48,6 +51,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
 
         // POST: api/LessonContents
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [HttpPost]
         [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
@@ -63,19 +67,41 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return BadRequest(Result<object>.Failure(new[] { "Dữ liệu không hợp lệ." }));
                 }
 
+                if (string.IsNullOrEmpty(request.Content) && string.IsNullOrEmpty(request.MediaUrl))
+                {
+                    return BadRequest(Result<object>.Failure(new[] { "Phải có ít nhất nội dung văn bản hoặc file phương tiện." }));
+                }
+
+                string mediaUrl = null;
+                string cloudFrontDomain = "https://drui9ols58b43.cloudfront.net";
+
+                // Nếu là ảnh -> Lấy URL từ CloudFront dựa trên ObjectKey từ S3
+                if (request.MediaType == "image" && !string.IsNullOrEmpty(request.MediaUrl))
+                {
+                    mediaUrl = $"{cloudFrontDomain}/{request.MediaUrl}"; // request.MediaUrl lúc này là objectKey từ S3
+                }
+                // Nếu là video -> Dùng URL trực tiếp
+                else if (request.MediaType == "video" && !string.IsNullOrEmpty(request.MediaUrl))
+                {
+                    mediaUrl = request.MediaUrl; // Giữ nguyên cách lưu video
+                }
+                else if (!string.IsNullOrEmpty(request.MediaUrl))
+                {
+                    return BadRequest(Result<object>.Failure(new[] { "MediaType không hợp lệ. Chỉ hỗ trợ 'image' hoặc 'video'." }));
+                }
+
                 var lessonContent = new LessonContent
                 {
                     LessonId = request.LessonId,
                     MediaType = request.MediaType,
-                    MediaUrl = request.MediaUrl,
+                    MediaUrl = mediaUrl,
                     Content = request.Content
                 };
 
                 _context.LessonContents.Add(lessonContent);
                 await _context.SaveChangesAsync();
 
-                // Trả về HTTP 200 với thông báo thành công
-                return Ok(Result<object>.Success("Thêm nội dung cho khóa học thành công."));
+                return Ok(Result<object>.Success("Thêm nội dung cho bài học thành công."));
             }
             catch (Exception ex)
             {
@@ -108,11 +134,22 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy nội dung bài học." }));
                 }
 
-                // Nếu URL media mới khác URL cũ => xóa file cũ
+                // Nếu URL media mới khác URL cũ => xóa file cũ (chỉ ảnh, không phải video)
                 if (!string.IsNullOrEmpty(lessonContent.MediaUrl) && lessonContent.MediaUrl != request.MediaUrl)
                 {
-                    DeleteFileIfExists(lessonContent.MediaUrl);
+                    string objectKey = ExtractS3ObjectKey(lessonContent.MediaUrl);
+
+                    if (!string.IsNullOrEmpty(objectKey))
+                    {
+                        await _s3Service.DeleteS3ObjectAsync(objectKey);
+                    }
+                    else
+                    {
+                        DeleteFileIfExists(lessonContent.MediaUrl); // Xóa file cục bộ
+                    }
                 }
+
+                // Cập nhật nội dung
                 lessonContent.MediaType = request.MediaType;
                 lessonContent.MediaUrl = request.MediaUrl;
                 lessonContent.Content = request.Content;
@@ -126,7 +163,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
-
 
         // DELETE: api/LessonContents/{id}
         [HttpDelete("{id}")]
@@ -147,8 +183,23 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy nội dung bài học." }));
                 }
-                DeleteFileIfExists(lessonContent.MediaUrl);
 
+                if (!string.IsNullOrEmpty(lessonContent.MediaUrl))
+                {
+                    string objectKey = ExtractS3ObjectKey(lessonContent.MediaUrl);
+
+                    if (!string.IsNullOrEmpty(objectKey) && !objectKey.Contains("uploads/"))
+                    {
+                        await _s3Service.DeleteS3ObjectAsync(objectKey);
+                    }
+                    else
+                    {
+                        DeleteFileIfExists(lessonContent.MediaUrl);
+                    }
+                }
+
+
+                // Xóa bản ghi trong database
                 _context.LessonContents.Remove(lessonContent);
                 await _context.SaveChangesAsync();
 
@@ -159,6 +210,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
+
+
         private void DeleteFileIfExists(string? filePath)
         {
             if (!string.IsNullOrEmpty(filePath))
@@ -168,6 +222,26 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 {
                     System.IO.File.Delete(fullPath);
                 }
+            }
+        }
+
+        private string ExtractS3ObjectKey(string url)
+        {
+            try
+            {
+                Uri uri = new Uri(url);
+                string path = uri.AbsolutePath;
+
+                if (string.IsNullOrEmpty(path) || path == "/")
+                {
+                    return string.Empty;
+                }
+
+                return path.TrimStart('/');
+            }
+            catch (Exception)
+            {
+                return string.Empty;
             }
         }
 

@@ -17,20 +17,20 @@ namespace Be_QuanLyKhoaHoc.Controllers
             _s3Service = s3Service;
         }
 
-        public record AvatarUploadResponse(
+        public record UploadResponse(
             string PresignedUrl,
             string ObjectKey
             );
 
         // Endpoint: GET /api/avatar/presigned-url?courseId=123&fileName=avatar.png&contentType=image/png
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
-        [HttpGet("avatar-presigned-url")]
-        [ProducesResponseType(typeof(Result<AvatarUploadResponse>), 200)]
+        [HttpGet("presigned-url")]
+        [ProducesResponseType(typeof(Result<UploadResponse>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetAvatarPresignedUrl([FromQuery] int courseId, [FromQuery] string fileName, [FromQuery] string contentType)
+        public async Task<IActionResult> GetPresignedUrl([FromQuery] string fileName, [FromQuery] string contentType, [FromQuery] string type)
         {
             // Kiểm tra thông tin đầu vào
             if (string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(contentType))
@@ -55,22 +55,15 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return BadRequest(Result<object>.Failure(new[] { "Loại tệp không hợp lệ. Chỉ chấp nhận các loại ảnh hợp lệ." }));
             }
 
-            // Xác thực giảng viên: lấy lecturerId từ JWT
-            var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(lecturerId))
-            {
-                return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
-            }
-
             try
             {
-                // Sử dụng folder cố định cho avatar, ví dụ: images/avatars
-                string objectKey = $"images/avatars/{Guid.NewGuid()}_{fileName}";
+                string folder = type.ToLower() == "avatar" ? "images/avatars" : "images/content";
+                string objectKey = $"{folder}/{Guid.NewGuid()}_{fileName}";
 
                 string presignedUrl = await _s3Service.GeneratePresignedUrlAsync(objectKey, contentType);
 
                 // Trả về URL upload và objectKey (để lưu vào DB sau này)
-                return Ok(Result<AvatarUploadResponse>.Success(new AvatarUploadResponse(presignedUrl, objectKey)));
+                return Ok(Result<UploadResponse>.Success(new UploadResponse(presignedUrl, objectKey)));
             }
             catch (Exception ex)
             {
