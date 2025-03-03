@@ -286,14 +286,14 @@ namespace Be_QuanLyKhoaHoc.Controllers
             return Ok(Result<string>.Success("Xóa tiến độ học viên và các kết quả liên quan thành công."));
         }
 
-        [HttpGet("course/{courseId}")]
+        [HttpGet("lesson-learn/{courseId}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [ProducesResponseType(typeof(Result<List<LessonLearnDto>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(object), 403)]
-        public async Task<IActionResult> GetLessonsByCourse(int courseId)
+        public async Task<IActionResult> GetLessonsByCourseForLearn(int courseId)
         {
             try
             {
