@@ -16,10 +16,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly S3Service _s3Service;
-        public LessonContentsController(ApplicationDbContext context, S3Service s3Service)
+        private readonly CloudFrontService _cloudFrontService;
+        public LessonContentsController(ApplicationDbContext context, S3Service s3Service, CloudFrontService cloudFrontService)
         {
             _context = context;
             _s3Service = s3Service;
+            _cloudFrontService = cloudFrontService;
         }
 
         // GET: api/LessonContents/{lessonId}
@@ -38,7 +40,9 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         lc.LessonContentId,
                         lc.LessonId,
                         lc.MediaType,
-                        lc.MediaUrl,
+                        lc.MediaType == "video" && !string.IsNullOrEmpty(lc.MediaUrl) && !lc.MediaUrl.StartsWith("http")
+                            ? _cloudFrontService.GenerateSignedUrl(lc.MediaUrl, DateTime.UtcNow.AddMinutes(60))
+                            : lc.MediaUrl,
                         lc.Content))
                     .ToListAsync();
 
@@ -51,7 +55,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
 
         // POST: api/LessonContents
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [HttpPost]
         [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
@@ -72,18 +75,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return BadRequest(Result<object>.Failure(new[] { "Phải có ít nhất nội dung văn bản hoặc file phương tiện." }));
                 }
 
-                string mediaUrl = null;
-                string cloudFrontDomain = "https://drui9ols58b43.cloudfront.net";
+                string? mediaUrl = null;
 
-                // Nếu là ảnh -> Lấy URL từ CloudFront dựa trên ObjectKey từ S3
+                // Nếu là ảnh -> Lấy URL từ CloudFrontService
                 if (request.MediaType == "image" && !string.IsNullOrEmpty(request.MediaUrl))
                 {
-                    mediaUrl = $"{cloudFrontDomain}/{request.MediaUrl}"; // request.MediaUrl lúc này là objectKey từ S3
+                    mediaUrl = _cloudFrontService.GetCloudFrontUrl(request.MediaUrl);
                 }
                 // Nếu là video -> Dùng URL trực tiếp
                 else if (request.MediaType == "video" && !string.IsNullOrEmpty(request.MediaUrl))
                 {
-                    mediaUrl = request.MediaUrl; // Giữ nguyên cách lưu video
+                    mediaUrl = request.MediaUrl;
                 }
                 else if (!string.IsNullOrEmpty(request.MediaUrl))
                 {
@@ -121,11 +123,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             try
             {
+                // Kiểm tra ID có khớp không
                 if (id != request.LessonContentId)
                 {
                     return BadRequest(Result<object>.Failure(new[] { "ID không khớp." }));
                 }
 
+                // Lấy nội dung bài học hiện tại từ cơ sở dữ liệu
                 var lessonContent = await _context.LessonContents
                     .FirstOrDefaultAsync(lc => lc.LessonContentId == id);
 
@@ -134,26 +138,47 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy nội dung bài học." }));
                 }
 
-                // Nếu URL media mới khác URL cũ => xóa file cũ (chỉ ảnh, không phải video)
+                // Xử lý xóa file media cũ nếu MediaUrl thay đổi
                 if (!string.IsNullOrEmpty(lessonContent.MediaUrl) && lessonContent.MediaUrl != request.MediaUrl)
                 {
-                    string objectKey = ExtractS3ObjectKey(lessonContent.MediaUrl);
-
-                    if (!string.IsNullOrEmpty(objectKey))
+                    string oldObjectKey = GetObjectKey(lessonContent.MediaType, lessonContent.MediaUrl);
+                    if (!string.IsNullOrEmpty(oldObjectKey))
                     {
-                        await _s3Service.DeleteS3ObjectAsync(objectKey);
-                    }
-                    else
-                    {
-                        DeleteFileIfExists(lessonContent.MediaUrl); // Xóa file cục bộ
+                        if (lessonContent.MediaType == "video" && oldObjectKey.EndsWith(".m3u8"))
+                        {
+                            // Xóa toàn bộ thư mục chứa video HLS
+                            string directoryKey = oldObjectKey.Substring(0, oldObjectKey.LastIndexOf('/') + 1);
+                            await _s3Service.DeleteS3DirectoryAsync(directoryKey);
+                        }
+                        else
+                        {
+                            // Xóa object đơn lẻ (ảnh hoặc media khác)
+                            await _s3Service.DeleteS3ObjectAsync(oldObjectKey);
+                        }
                     }
                 }
 
-                // Cập nhật nội dung
+                // Cập nhật các trường mới
                 lessonContent.MediaType = request.MediaType;
-                lessonContent.MediaUrl = request.MediaUrl;
                 lessonContent.Content = request.Content;
 
+                // Xử lý MediaUrl mới
+                if (request.MediaType == "image")
+                {
+                    // Giả sử MediaUrl mới là URL đầy đủ từ CloudFront
+                    lessonContent.MediaUrl = request.MediaUrl;
+                }
+                else if (request.MediaType == "video")
+                {
+                    // Giả sử MediaUrl mới là đường dẫn tương đối (object key)
+                    lessonContent.MediaUrl = request.MediaUrl;
+                }
+                else
+                {
+                    lessonContent.MediaUrl = null; // Trường hợp không có media
+                }
+
+                // Lưu thay đổi vào cơ sở dữ liệu
                 await _context.SaveChangesAsync();
 
                 return Ok(Result<object>.Success("Cập nhật thành công."));
@@ -186,15 +211,21 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
                 if (!string.IsNullOrEmpty(lessonContent.MediaUrl))
                 {
-                    string objectKey = ExtractS3ObjectKey(lessonContent.MediaUrl);
+                    string objectKey = GetObjectKey(lessonContent.MediaType, lessonContent.MediaUrl);
 
-                    if (!string.IsNullOrEmpty(objectKey) && !objectKey.Contains("uploads/"))
+                    if (!string.IsNullOrEmpty(objectKey))
                     {
-                        await _s3Service.DeleteS3ObjectAsync(objectKey);
-                    }
-                    else
-                    {
-                        DeleteFileIfExists(lessonContent.MediaUrl);
+                        if (lessonContent.MediaType == "video" && objectKey.EndsWith(".m3u8"))
+                        {
+                            // Xóa toàn bộ thư mục chứa video HLS
+                            string directoryKey = objectKey.Substring(0, objectKey.LastIndexOf('/') + 1);
+                            await _s3Service.DeleteS3DirectoryAsync(directoryKey);
+                        }
+                        else
+                        {
+                            // Xóa object đơn lẻ (ảnh hoặc media khác)
+                            await _s3Service.DeleteS3ObjectAsync(objectKey);
+                        }
                     }
                 }
 
@@ -213,16 +244,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
 
 
-        private void DeleteFileIfExists(string? filePath)
+        private string GetObjectKey(string mediaType, string mediaUrl)
         {
-            if (!string.IsNullOrEmpty(filePath))
+            if (mediaType == "image")
             {
-                string fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", filePath.TrimStart('/'));
-                if (System.IO.File.Exists(fullPath))
-                {
-                    System.IO.File.Delete(fullPath);
-                }
+                return ExtractS3ObjectKey(mediaUrl); // Trích xuất object key từ URL cho ảnh
             }
+            else if (mediaType == "video")
+            {
+                return mediaUrl; // Dùng trực tiếp MediaUrl làm object key cho video
+            }
+            return string.Empty;
         }
 
         private string ExtractS3ObjectKey(string url)

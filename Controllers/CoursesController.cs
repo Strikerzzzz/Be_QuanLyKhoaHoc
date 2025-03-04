@@ -17,11 +17,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly S3Service _s3Service;
+        private readonly CloudFrontService _cloudFrontService;
 
-        public CoursesController(ApplicationDbContext context, S3Service s3Service)
+        public CoursesController(ApplicationDbContext context, S3Service s3Service, CloudFrontService cloudFrontService)
         {
             _context = context;
             _s3Service = s3Service;
+            _cloudFrontService = cloudFrontService;
         }
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(Result<object>), 200)]
@@ -359,7 +361,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        // PUT /api/courses/{courseId}/avatar
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [HttpPut("{courseId}/avatar-course")]
         [ProducesResponseType(typeof(Result<string>), 200)]
@@ -393,11 +394,20 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học hoặc không có quyền chỉnh sửa." }));
                 }
 
-                string cloudFrontDomain = "https://drui9ols58b43.cloudfront.net";
-                string avatarUrl = $"{cloudFrontDomain}/{request.AvatarObjectKey}";
+                // Xử lý xóa avatar cũ nếu tồn tại và khác với avatar mới
+                if (!string.IsNullOrEmpty(course.AvatarUrl))
+                {
+                    string oldObjectKey = ExtractS3ObjectKey(course.AvatarUrl);
+                    if (!string.IsNullOrEmpty(oldObjectKey) && oldObjectKey != request.AvatarObjectKey)
+                    {
+                        await _s3Service.DeleteS3ObjectAsync(oldObjectKey);
+                    }
+                }
 
-                // Cập nhật AvatarUrl của khóa học
+                // Cập nhật AvatarUrl với avatar mới
+                string avatarUrl = _cloudFrontService.GetCloudFrontUrl(request.AvatarObjectKey);
                 course.AvatarUrl = avatarUrl;
+
                 await _context.SaveChangesAsync();
 
                 return Ok(Result<string>.Success("Cập nhật avatar thành công."));

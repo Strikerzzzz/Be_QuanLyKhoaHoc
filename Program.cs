@@ -48,6 +48,11 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 524288000; // 500 MB
+});
+
 
 // Add services to the container.
 builder.Services.AddControllers().AddJsonOptions(options =>
@@ -67,6 +72,8 @@ builder.Services.AddScoped<LoginUser>();
 builder.Services.AddScoped<IAppEmailSender, AppEmailSender>();
 builder.Services.AddScoped<QuestionService>();
 builder.Services.AddSingleton<S3Service>();
+builder.Services.AddScoped<VideoConverterService>();
+builder.Services.AddSingleton<CloudFrontService>();
 
 builder.Services.AddAuthorization(options =>
 {
@@ -122,13 +129,6 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
-    RequestPath = new PathString("")
-});
-
 
 app.MapControllers();
 app.Run();

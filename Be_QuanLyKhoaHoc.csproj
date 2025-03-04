@@ -7,6 +7,7 @@
     <UserSecretsId>87a3a53f-7028-4ca1-9af7-aca1181e5a02</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>.</DockerfileContext>
+    <StartupObject></StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,7 +31,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="wwwroot\hls\" />
     <Folder Include="wwwroot\uploads\" />
+    <Folder Include="wwwroot\uploads\videos\" />
   </ItemGroup>
 
 </Project>

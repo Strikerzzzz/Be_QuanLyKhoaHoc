@@ -17,7 +17,7 @@ namespace Be_QuanLyKhoaHoc.Identity.Entities
         [MaxLength(50)]
         public string? MediaType { get; set; }
 
-        [MaxLength(255)]
+        [MaxLength(1000)]
         public string? MediaUrl { get; set; }
 
         public string? Content { get; set; }
