@@ -420,40 +420,57 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-
-        [HttpGet("{assignmentId}/result")]
+        [HttpGet("learning-progress/{courseId}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<object>), 200)]
+        [ProducesResponseType(typeof(Result<List<LessonLearnDto>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetAssignmentResult(int assignmentId)
+        public async Task<IActionResult> GetLearningProgress(int courseId)
         {
-            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(studentId))
-            {
-                return Unauthorized(Result<object>.Failure(new[] { "Thông tin người học không hợp lệ." }));
-            }
-
             try
             {
-                var result = await _context.AssignmentResults
-                    .AsNoTracking()
-                    .Where(ar => ar.AssignmentId == assignmentId && ar.StudentId == studentId)
-                    .Select(ar => new
-                    {
-                        ar.ResultId,
-                        ar.Score,
-                        ar.SubmissionTime
-                    })
-                    .FirstOrDefaultAsync();
-
-                if (result == null)
+                // Lấy userId từ token JWT
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return NotFound(Result<object>.Failure(new[] { "Bạn chưa có kết quả cho bài tập này." }));
+                    return Unauthorized(Result<object>.Failure(new[] { "Không thể xác định người dùng." }));
                 }
 
-                return Ok(Result<object>.Success(result));
+                // Kiểm tra xem khóa học có tồn tại không
+                var course = await _context.Courses.FindAsync(courseId);
+                if (course == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                // Lấy danh sách bài học của khóa học kèm theo trạng thái hoàn thành và điểm bài tập (nếu có)
+                var lessons = await _context.Lessons
+                    .Where(l => l.CourseId == courseId)
+                    .OrderBy(l => l.LessonId)
+                    .Select(l => new
+                    {
+                        l.LessonId,
+                        l.Title,
+                        IsCompleted = _context.CompletedLessons
+                            .Any(cl => cl.LessonId == l.LessonId && cl.StudentId == userId),
+                        AssignmentScore = l.Assignments != null
+                            ? _context.AssignmentResults
+                                .Where(ar => ar.AssignmentId == l.Assignments.AssignmentId && ar.StudentId == userId)
+                                .Select(ar => (float?)ar.Score)
+                                .FirstOrDefault()
+                            : null
+                    })
+                    .ToListAsync();
+
+
+                // Kiểm tra xem có bài học nào không
+                if (!lessons.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có bài học nào trong khóa học này." }));
+                }
+
+                return Ok(Result<object>.Success(lessons));
             }
             catch (Exception ex)
             {
