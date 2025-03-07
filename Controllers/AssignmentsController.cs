@@ -13,7 +13,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
     public class AssignmentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -160,6 +159,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // Tạo mới bài tập
         [HttpPost]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 403)]
@@ -222,6 +222,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // Cập nhật bài tập
         [HttpPut("{id}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 404)]
@@ -283,6 +284,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // Xóa bài tập
         [HttpDelete("{id}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 403)]

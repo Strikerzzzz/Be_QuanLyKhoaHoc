@@ -11,7 +11,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
     public class LessonContentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -23,7 +22,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
             _s3Service = s3Service;
             _cloudFrontService = cloudFrontService;
         }
-
         // GET: api/LessonContents/{lessonId}
         [HttpGet("{lessonId}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
@@ -56,6 +54,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // POST: api/LessonContents
         [HttpPost]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 401)]
@@ -113,6 +112,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // PUT: api/LessonContents/{id}
         [HttpPut("{id}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
         [ProducesResponseType(typeof(Result<object>), 401)]
@@ -191,6 +191,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // DELETE: api/LessonContents/{id}
         [HttpDelete("{id}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<object>), 200)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 403)]

@@ -361,7 +361,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [HttpPut("{courseId}/avatar-course")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]

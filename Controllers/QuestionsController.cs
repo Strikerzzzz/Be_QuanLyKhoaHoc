@@ -12,7 +12,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
     public class QuestionsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
