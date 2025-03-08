@@ -27,8 +27,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(object), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetProgressForCourse([FromQuery] int courseId, [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10, [FromQuery] string search = null)
+        public async Task<IActionResult> GetProgressForCourse(
+                [FromQuery] int courseId,
+                [FromQuery] int page = 1,
+                [FromQuery] int pageSize = 10,
+                [FromQuery] string search = null,
+                [FromQuery] bool sortBy = false)
         {
             try
             {
@@ -52,14 +56,20 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
                 if (page > totalPages) page = totalPages;
 
-                var progressList = await query
-                    .OrderBy(p => p.StudentId)
+                // Áp dụng sắp xếp theo CompletionRate
+                var sortedQuery = sortBy
+                    ? query.OrderByDescending(p => p.CompletionRate) // true: cao -> thấp
+                    : query.OrderBy(p => p.CompletionRate);          // false: thấp -> cao
+
+                var progressList = await sortedQuery
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
                     .Select(p => new ProgressDto(
                         p.ProgressId,
                         p.StudentId,
                         p.Student.FullName,
+                        p.Student.UserName,
+                        p.Student.Email,
                         p.CompletionRate,
                         p.IsCompleted,
                         p.UpdatedAt
@@ -103,6 +113,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
                         p.ProgressId,
                         p.StudentId,
                         p.Student.FullName,
+                        p.Student.UserName,
+                        p.Student.Email,
                         p.CompletionRate,
                         p.IsCompleted,
                         p.UpdatedAt
@@ -298,7 +310,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
             try
             {
                 // Lấy userId từ token JWT
-                var userId= User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 if (string.IsNullOrEmpty(userId))
                 {
                     return Unauthorized(Result<object>.Failure(new[] { "Không thể xác định người dùng." }));
@@ -336,13 +348,60 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+        [HttpGet("progress/piechart")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [ProducesResponseType(typeof(Result<PieChartResultDto>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(object), 403)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> GetProgressPieChart([FromQuery] int courseId)
+        {
+            try
+            {
+                var query = _context.Progresses.AsNoTracking()
+                    .Where(p => p.CourseId == courseId);
+
+                if (!query.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có tiến độ nào cho khóa học này." }));
+                }
+
+                // Tính tỷ lệ hoàn thành cho các nhóm (Hoàn thành, Đang học, Chưa hoàn thành)
+                var progressGroups = await query
+                    .GroupBy(p => new
+                    {
+                        CompletionStatus = p.CompletionRate >= 100 ? "Hoàn thành" :
+                                           p.CompletionRate >= 2 ? "Đang học" : "Chưa học"
+                    })
+                    .Select(g => new
+                    {
+                        Status = g.Key.CompletionStatus,
+                        Count = g.Count()
+                    })
+                    .ToListAsync();
+
+                // Tạo đối tượng PieChartResultDto
+                var labels = progressGroups.Select(g => g.Status).ToArray();
+                var values = progressGroups.Select(g => g.Count).ToArray();
+                var pieChartData = new PieChartResultDto(labels, values);
+
+                return Ok(Result<PieChartResultDto>.Success(pieChartData));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
+            }
+        }
     }
+
     public record CreateProgressRequest([Required] int CourseId);
 
     public record ProgressDto(
         int ProgressId,
         string StudentId,
-        string StudentName,
+        string? StudentName,
+        string? StudentUserName,
+        string? StudentEmail,
         float CompletionRate,
         bool IsCompleted,
         DateTime UpdatedAt
@@ -354,6 +413,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
             bool Completed
          );
     public record ProgressPagedResult(IEnumerable<ProgressDto> Progresses, int TotalCount);
+
+    public record PieChartResultDto(string[] Labels, int[] Values);
 
 
 }
