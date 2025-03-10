@@ -422,7 +422,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         [HttpGet("learning-progress/{courseId}")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
-        [ProducesResponseType(typeof(Result<List<LessonLearnDto>>), 200)]
+        [ProducesResponseType(typeof(Result<List<LearnProgressDto>>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
@@ -542,5 +542,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
         public record UpdateAssignmentRequest(string Title, string? Description, int RandomMultipleChoiceCount);
 
         public record SubmitAssignmentRequest(float Score);
+        public record LearnProgressDto(
+             int LessonId,
+             string Title,
+            bool IsCompleted,
+            float? AssignmentScore
+         );
     }
 }
