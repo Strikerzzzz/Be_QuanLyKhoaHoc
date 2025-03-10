@@ -603,6 +603,51 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
+        [HttpGet("list-by/{courseId}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User,Lecturer")]
+        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> GetAssignmentsByCourse(int courseId)
+        {
+            try
+            {
+                // Kiểm tra sự tồn tại của khóa học
+                var course = await _context.Courses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.CourseId == courseId);
+
+                if (course == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                // Lấy danh sách bài tập với 3 trường yêu cầu
+                var assignments = await _context.Assignments
+                    .AsNoTracking()
+                    .Where(a => a.Lesson.CourseId == courseId)
+                    .Select(a => new
+                    {
+                        a.AssignmentId,
+                        a.Title,
+                        a.Description
+                    })
+                    .ToListAsync();
+
+                if (!assignments.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có bài tập nào trong khóa học này." }));
+                }
+
+                return Ok(Result<IEnumerable<object>>.Success(assignments));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
+            }
+        }
+
         public class LineChartDto
         {
             public string Title { get; set; }  // Tiêu đề (Mức điểm, ví dụ: "1-10", "11-20", ...)

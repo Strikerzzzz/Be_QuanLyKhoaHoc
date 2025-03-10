@@ -7,6 +7,8 @@ using SampleProject.Common;
 using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Enums;
 using Be_QuanLyKhoaHoc.DTO;
+using static Be_QuanLyKhoaHoc.Controllers.AssignmentsController;
+using System.Linq;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -503,7 +505,81 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
             }
         }
+        [HttpGet("chart/{courseId}/score-line-exam")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [ProducesResponseType(typeof(Result<IEnumerable<LineChartDto>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 403)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> GetCourseExamScoreLineChart(int courseId)
+        {
+            // Lấy ID giảng viên từ token
+            var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(lecturerId))
+            {
+                return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
+            }
 
+            try
+            {
+                // Kiểm tra khóa học và quyền truy cập
+                var courseInfo = await _context.Courses
+                    .AsNoTracking()
+                    .Where(c => c.CourseId == courseId)
+                    .Select(c => new { c.CourseId, c.LecturerId })
+                    .FirstOrDefaultAsync();
+
+                if (courseInfo == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
+                }
+
+                if (courseInfo.LecturerId != lecturerId)
+                {
+                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xem kết quả của khóa học này." }));
+                }
+
+                // Lấy danh sách bài kiểm tra của khóa học
+                var examIds = await _context.Exams
+                    .Where(e => e.CourseId == courseId)
+                    .Select(e => e.ExamId)
+                    .ToListAsync();
+
+                if (!examIds.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có bài kiểm tra nào trong khóa học này." }));
+                }
+
+                // Lấy kết quả điểm của học viên
+                var results = await _context.ExamResults
+                    .AsNoTracking()
+                    .Where(er => examIds.Contains(er.ExamId ?? 0))
+                    .Select(er => new { er.ResultId, er.Score })
+                    .ToListAsync();
+
+                if (!results.Any())
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có kết quả bài kiểm tra nào trong khóa học này." }));
+                }
+
+                // Định nghĩa các khoảng điểm
+                var scoreRanges = new[] { 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+
+                // Tạo dữ liệu biểu đồ
+                var lineChartData = scoreRanges.Select(range => new LineChartDto
+                {
+                    Title = $"{range - 9}-{range}", // Ví dụ: "1-10", "11-20", ...
+                    Value = results.Count(r => r.Score >= range - 9 && r.Score <= range)
+                }).ToList();
+
+                return Ok(Result<IEnumerable<LineChartDto>>.Success(lineChartData));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
+            }
+        }
         public record SubmitExamRequest(float Score);
     }
 }
