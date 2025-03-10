@@ -411,13 +411,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
 
         // Người học xem kết quả bài kiểm tra của mình
-        [HttpGet("{examId}/result")]
+        [HttpGet("{courseId}/result")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
-        public async Task<IActionResult> GetExamResult(int examId)
+        public async Task<IActionResult> GetExamResult(int courseId)
         {
             var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(studentId))
@@ -429,10 +429,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
             {
                 var examResult = await _context.ExamResults
                     .AsNoTracking()
-                    .Where(er => er.ExamId == examId && er.StudentId == studentId)
+                    .Where(er => er.Exam != null && er.Exam.CourseId == courseId && er.StudentId == studentId)
                     .Select(er => new
                     {
                         er.ResultId,
+                        er.Exam.Title,
                         er.Score,
                         er.SubmissionTime
                     })
