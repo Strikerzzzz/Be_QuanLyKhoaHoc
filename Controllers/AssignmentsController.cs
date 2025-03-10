@@ -536,7 +536,78 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
             }
         }
+        [HttpGet("{assignmentId}/score-line-chart")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [ProducesResponseType(typeof(Result<IEnumerable<LineChartDto>>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        [ProducesResponseType(typeof(Result<object>), 403)]
+        public async Task<IActionResult> GetScoreLineChart(int assignmentId)
+        {
+            var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(lecturerId))
+            {
+                return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
+            }
 
+            try
+            {
+                // Kiểm tra sự tồn tại của bài tập và xác thực quyền của giảng viên thông qua quan hệ (Assignment → Lesson → Course)
+                var assignmentInfo = await _context.Assignments
+                    .AsNoTracking()
+                    .Where(a => a.AssignmentId == assignmentId)
+                    .Select(a => new
+                    {
+                        a.AssignmentId,
+                        LecturerId = a.Lesson.Course.LecturerId
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (assignmentInfo == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài tập." }));
+                }
+
+                if (assignmentInfo.LecturerId != lecturerId)
+                {
+                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xem bài nộp của bài tập này." }));
+                }
+
+                // Truy vấn danh sách kết quả nộp bài tập của học viên
+                var results = await _context.AssignmentResults
+                    .AsNoTracking()
+                    .Where(ar => ar.AssignmentId == assignmentId)
+                    .Select(ar => new
+                    {
+                        ar.ResultId,
+                        ar.Score
+                    })
+                    .ToListAsync();
+
+                // Tính số lượng sinh viên ở mỗi mức điểm từ 1-10, 11-20,..., 91-100
+                var scoreRanges = new[] { 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+
+                // Tạo danh sách các điểm và số lượng sinh viên trong mỗi mức điểm
+                var lineChartData = scoreRanges.Select(range => new LineChartDto
+                {
+                    Title = $"{range - 9}-{range}", // Tiêu đề cho từng mức điểm
+                    Value = results.Count(r => r.Score >= range - 9 && r.Score <= range)
+                }).ToList();
+
+                return Ok(Result<IEnumerable<LineChartDto>>.Success(lineChartData));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
+            }
+        }
+
+        public class LineChartDto
+        {
+            public string Title { get; set; }  // Tiêu đề (Mức điểm, ví dụ: "1-10", "11-20", ...)
+            public int Value { get; set; }  // Số lượng sinh viên đạt mức điểm này
+        }
 
         public record CreateAssignmentRequest(int LessonId, string Title, string? Description, int RandomMultipleChoiceCount);
         public record UpdateAssignmentRequest(string Title, string? Description, int RandomMultipleChoiceCount);
