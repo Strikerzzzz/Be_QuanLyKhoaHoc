@@ -480,12 +480,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         [HttpGet("{assignmentId}/results")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<AssignmentResultPagedResult>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 403)]
-        public async Task<IActionResult> GetAssignmentResults(int assignmentId)
+        public async Task<IActionResult> GetAssignmentResults(
+        int assignmentId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string studentName = null,
+        [FromQuery] bool sortByScore = false)
         {
             var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(lecturerId))
@@ -495,7 +500,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                // Kiểm tra sự tồn tại của bài tập và xác thực quyền của giảng viên thông qua quan hệ (Assignment → Lesson → Course)
+                // Kiểm tra xem bài tập có tồn tại và giảng viên có quyền truy cập không
                 var assignmentInfo = await _context.Assignments
                     .AsNoTracking()
                     .Where(a => a.AssignmentId == assignmentId)
@@ -516,26 +521,73 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xem bài nộp của bài tập này." }));
                 }
 
-                // Truy vấn danh sách kết quả nộp bài tập của học viên
-                var results = await _context.AssignmentResults
+                // Truy vấn cơ bản
+                var query = _context.AssignmentResults
                     .AsNoTracking()
                     .Where(ar => ar.AssignmentId == assignmentId)
-                    .Select(ar => new
-                    {
-                        ar.ResultId,
-                        StudentName = ar.Student.FullName,
-                        ar.Score,
-                        ar.SubmissionTime
-                    })
+                    .Join(_context.Users,
+                        ar => ar.StudentId,
+                        s => s.Id,
+                        (ar, s) => new { ar, s });
+
+                // Tìm kiếm bằng LIKE (không dùng full-text search)
+                if (!string.IsNullOrEmpty(studentName))
+                {
+                    query = query.Where(joined =>
+                        EF.Functions.Like(joined.s.FullName, $"%{studentName}%") ||
+                        EF.Functions.Like(joined.s.UserName, $"%{studentName}%") ||
+                        EF.Functions.Like(joined.s.Email, $"%{studentName}%"));
+                }
+
+                // Tổng số kết quả tìm được
+                var totalCount = await query.CountAsync();
+                if (totalCount == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy kết quả bài nộp." }));
+                }
+
+                // Phân trang
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+                if (page > totalPages) page = totalPages;
+                if (page <= 0) page = 1;
+                if (pageSize <= 0) pageSize = 10;
+
+                
+                if (sortByScore)
+                {
+                    query = query.OrderByDescending(joined => joined.ar.Score)
+                                 .ThenBy(joined => joined.ar.SubmissionTime);
+                }
+                else
+                {
+                    query = query.OrderBy(joined => joined.ar.Score)
+                                 .ThenBy(joined => joined.ar.SubmissionTime);
+                }
+
+
+                // Truy vấn lấy dữ liệu
+                var results = await query
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(joined => new AssignmentResultDto(
+                        joined.ar.ResultId,
+                        joined.s.FullName,
+                        joined.s.UserName,
+                        joined.s.Email,
+                        joined.ar.Score,
+                        joined.ar.SubmissionTime
+                    ))
                     .ToListAsync();
 
-                return Ok(Result<IEnumerable<object>>.Success(results));
+                var result = new AssignmentResultPagedResult(results, totalCount);
+                return Ok(Result<AssignmentResultPagedResult>.Success(result));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
+                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
+
         [HttpGet("{assignmentId}/score-line-chart")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<IEnumerable<LineChartDto>>), 200)]
@@ -664,5 +716,19 @@ namespace Be_QuanLyKhoaHoc.Controllers
             bool IsCompleted,
             float? AssignmentScore
          );
+        public record AssignmentResultDto(
+            int ResultId,
+            string? StudentName,
+            string? UserName,
+            string? Email,
+            double Score,
+            DateTime? SubmissionTime
+        );
+
+        public record AssignmentResultPagedResult(
+            List<AssignmentResultDto> Results,
+            int TotalCount
+        );
+
     }
 }

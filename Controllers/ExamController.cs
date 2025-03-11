@@ -452,15 +452,19 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-        // Giảng viên xem danh sách kết quả của học viên
         [HttpGet("{examId}/results")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
-        [ProducesResponseType(typeof(Result<IEnumerable<object>>), 200)]
+        [ProducesResponseType(typeof(Result<ExamResultPagedResult>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 403)]
-        public async Task<IActionResult> GetExamResults(int examId)
+        public async Task<IActionResult> GetExamResults(
+        int examId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string studentName = null,
+        [FromQuery] bool sortByScore = false)
         {
             var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(lecturerId))
@@ -471,10 +475,10 @@ namespace Be_QuanLyKhoaHoc.Controllers
             try
             {
                 var examInfo = await _context.Exams
-                .AsNoTracking()
-                .Where(e => e.ExamId == examId)
-                .Select(e => new { e.ExamId, LecturerId = e.Course.LecturerId })
-                .FirstOrDefaultAsync();
+                    .AsNoTracking()
+                    .Where(e => e.ExamId == examId)
+                    .Select(e => new { e.ExamId, LecturerId = e.Course.LecturerId })
+                    .FirstOrDefaultAsync();
 
                 if (examInfo == null)
                 {
@@ -486,26 +490,67 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xem kết quả bài kiểm tra này." }));
                 }
 
-                // Truy vấn kết quả bài kiểm tra của tất cả sinh viên dựa trên examId
-                var results = await _context.ExamResults
-                    .AsNoTracking()
-                    .Where(er => er.ExamId == examId)
-                    .Select(er => new
-                    {
-                        er.ResultId,
-                        StudentName = er.Student.FullName,
-                        er.Score,
-                        er.SubmissionTime
-                    })
+                var query = _context.ExamResults
+                 .AsNoTracking()
+                 .Where(er => er.ExamId == examId)
+                 .Join(_context.Users,
+                     er => er.StudentId,
+                     s => s.Id,
+                     (er, s) => new { er, s });
+
+                // Tìm kiếm theo LIKE
+                if (!string.IsNullOrEmpty(studentName))
+                {
+                    query = query.Where(joined =>
+                        EF.Functions.Like(joined.s.FullName, $"%{studentName}%") ||
+                        EF.Functions.Like(joined.s.UserName, $"%{studentName}%") ||
+                        EF.Functions.Like(joined.s.Email, $"%{studentName}%"));
+                }
+
+                var totalCount = await query.CountAsync();
+                if (totalCount == 0)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không có kết quả phù hợp." }));
+                }
+
+                // Tính tổng số trang
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+                if (page > totalPages) page = totalPages;
+
+                // Sắp xếp theo điểm nếu sortByScore = true, còn lại thì sắp xếp tăng dần
+                if (sortByScore)
+                {
+                    query = query.OrderByDescending(joined => joined.er.Score)
+                                 .ThenBy(joined => joined.er.SubmissionTime);
+                }
+                else
+                {
+                    query = query.OrderBy(joined => joined.er.Score)
+                                 .ThenBy(joined => joined.er.SubmissionTime);
+                }
+
+
+                var results = await query
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(joined => new ExamResultDto(
+                        joined.er.ResultId,
+                        joined.s.FullName,
+                        joined.s.UserName,
+                        joined.s.Email,
+                        joined.er.Score,
+                        joined.er.SubmissionTime))
                     .ToListAsync();
 
-                return Ok(Result<IEnumerable<object>>.Success(results));
+                var result = new ExamResultPagedResult(results, totalCount);
+                return Ok(Result<ExamResultPagedResult>.Success(result));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, Result<object>.Failure(new[] { $"Lỗi hệ thống: {ex.Message}" }));
             }
         }
+
         [HttpGet("chart/{courseId}/score-line-exam")]
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<IEnumerable<LineChartDto>>), 200)]
@@ -582,5 +627,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
         public record SubmitExamRequest(float Score);
+        public record ExamResultDto(
+        int ResultId,
+        string? StudentName,
+        string? UserName,
+        string? Email,
+        double Score,
+        DateTime? SubmissionTime);
+
+        public record ExamResultPagedResult(
+        IEnumerable<ExamResultDto> Results,
+        int TotalCount);
+
     }
 }
