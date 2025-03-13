@@ -10,6 +10,7 @@ using Be_QuanLyKhoaHoc.Services.Interfaces;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Net;
 using static Be_QuanLyKhoaHoc.Services.LoginUser;
+using System.Globalization;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -445,6 +446,66 @@ namespace Be_QuanLyKhoaHoc.Controllers
             else
             {
                 return StatusCode(500, Result<object>.Failure(result.Errors.Select(e => e.Description).ToArray()));
+            }
+        }
+
+        [HttpGet("user-statistics")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Admin")]
+        [ProducesResponseType(typeof(Result<object>), 200)] // Success
+        [ProducesResponseType(typeof(Result<object>), 400)] // Validation failure
+        [ProducesResponseType(typeof(object), 401)] // Unauthorized
+        [ProducesResponseType(typeof(object), 403)] // Forbidden
+        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
+        public async Task<IActionResult> GetUserStatistics([FromQuery] string period)
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+                IQueryable<User> query = _context.Users;
+
+                object statistics = null;
+
+                switch (period?.ToLower())
+                {
+                    case "days":
+                        var tenDaysAgo = now.Date.AddDays(-9); // Lấy 10 ngày gần nhất
+                        statistics = await query
+                            .Where(u => u.CreatedAt >= tenDaysAgo)
+                            .GroupBy(u => u.CreatedAt.Date)
+                            .Select(g => new { Date = g.Key, Count = g.Count() })
+                            .OrderBy(g => g.Date)
+                            .ToListAsync();
+                        break;
+
+                    case "months":
+                        var twelveMonthsAgo = new DateTime(now.Year, now.Month, 1).AddMonths(-11); // Lấy 12 tháng gần nhất
+                        statistics = await query
+                            .Where(u => u.CreatedAt >= twelveMonthsAgo)
+                            .GroupBy(u => new { u.CreatedAt.Year, u.CreatedAt.Month })
+                            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+                            .OrderBy(g => g.Year).ThenBy(g => g.Month)
+                            .ToListAsync();
+                        break;
+
+                    case "years":
+                        var fiveYearsAgo = new DateTime(now.Year - 4, 1, 1); // Lấy 5 năm gần nhất
+                        statistics = await query
+                            .Where(u => u.CreatedAt >= fiveYearsAgo)
+                            .GroupBy(u => u.CreatedAt.Year)
+                            .Select(g => new { Year = g.Key, Count = g.Count() })
+                            .OrderBy(g => g.Year)
+                            .ToListAsync();
+                        break;
+
+                    default:
+                        return BadRequest(Result<object>.Failure(new[] { "Tham số period không hợp lệ. Chọn 'days', 'months', hoặc 'years'." }));
+                }
+
+                return Ok(Result<object>.Success(statistics));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
             }
         }
     }
