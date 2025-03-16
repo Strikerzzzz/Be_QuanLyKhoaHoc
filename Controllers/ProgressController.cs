@@ -237,7 +237,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 .CountAsync();
 
 
-            progress.CompletionRate = (float)completedLessons / totalLessons * 100;
+            progress.CompletionRate = (int)Math.Round((float)completedLessons / totalLessons * 100);
             progress.IsCompleted = (completedLessons == totalLessons);
             progress.UpdatedAt = DateTime.UtcNow;
 
