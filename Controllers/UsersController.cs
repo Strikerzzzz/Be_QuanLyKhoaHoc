@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity.UI.Services;
 using System.Net;
 using static Be_QuanLyKhoaHoc.Services.LoginUser;
 using System.Globalization;
+using System.Security.Claims;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -43,6 +44,11 @@ namespace Be_QuanLyKhoaHoc.Controllers
         public record RefreshTokenRequest(string RefreshToken);
         public record RefreshTokenResponse(string AccessToken, string RefreshToken);
         public record UserPagedResult(IEnumerable<User> Users, int TotalCount);
+        public record UpdateUserProfileRequest(
+        string? PhoneNumber,
+        string? FullName,
+        string? AvatarUrl
+    );
 
         // POST: /users/register
         [HttpPost("register")]
@@ -502,6 +508,87 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 }
 
                 return Ok(Result<object>.Success(statistics));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
+            }
+
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
+        [HttpGet("profile")]
+        [ProducesResponseType(typeof(Result<User>), 200)]
+        [ProducesResponseType(typeof(object), 400)]
+        [ProducesResponseType(typeof(object), 401)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> GetUserProfile()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(Result<object>.Failure(new[] { "Không có thông tin người dùng." }));
+                }
+
+                var user = await _context.Users.AsNoTracking()
+                             .FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+
+                if (user == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
+                }
+
+                return Ok(Result<User>.Success(user));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, Result<object>.Failure(new[] { ex.Message }));
+            }
+        }
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
+        [HttpPut("profile")]
+        [ProducesResponseType(typeof(Result<User>), 200)]
+        [ProducesResponseType(typeof(object), 400)]
+        [ProducesResponseType(typeof(object), 401)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
+        public async Task<IActionResult> UpdateUserProfile([FromBody] UpdateUserProfileRequest request)
+        {
+            try
+            {
+                // Lấy giá trị ID của người dùng từ token
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(Result<object>.Failure(new[] { "Không có thông tin người dùng." }));
+                }
+
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+                if (user == null)
+                {
+                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
+                }
+
+                if (request.PhoneNumber != null)
+                {
+                    user.PhoneNumber = request.PhoneNumber;
+                }
+                if (request.FullName != null)
+                {
+                    user.FullName = request.FullName;
+                }
+                if (request.AvatarUrl != null)
+                {
+                    user.AvatarUrl = request.AvatarUrl;
+                }
+
+                // Lưu thay đổi vào database
+                await _context.SaveChangesAsync();
+
+                return Ok(Result<User>.Success(user));
             }
             catch (Exception ex)
             {
