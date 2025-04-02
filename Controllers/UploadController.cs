@@ -25,7 +25,8 @@ namespace Be_QuanLyKhoaHoc.Controllers
             );
 
         // Endpoint: GET /api/avatar/presigned-url?courseId=123&fileName=avatar.png&contentType=image/png
-        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        // [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")] 
         [HttpGet("presigned-url")]
         [ProducesResponseType(typeof(Result<UploadResponse>), 200)]
         [ProducesResponseType(typeof(Result<object>), 400)]
