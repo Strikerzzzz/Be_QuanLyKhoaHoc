@@ -5,6 +5,8 @@ using System.Security.Claims;
 using Be_QuanLyKhoaHoc.Identity.Entities;
 using SampleProject.Common;
 using Be_QuanLyKhoaHoc.Identity;
+using System.Linq;
+using Be_QuanLyKhoaHoc.Services;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -14,10 +16,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
     public class LessonsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly DeleteService _deleteService;
 
-        public LessonsController(ApplicationDbContext context)
+        public LessonsController(ApplicationDbContext context, DeleteService deleteService)
         {
             _context = context;
+            _deleteService = deleteService;
         }
 
         [HttpGet("course/{courseId}")]
@@ -150,6 +154,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // Xóa bài học
         [HttpDelete("{id}")]
+        [Authorize(AuthenticationSchemes = "Bearer", Roles = "Lecturer")]
         [ProducesResponseType(typeof(Result<string>), 200)]
         [ProducesResponseType(typeof(Result<object>), 404)]
         [ProducesResponseType(typeof(Result<object>), 401)]
@@ -163,45 +168,25 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
             }
 
-            try
+            var result = await _deleteService.DeleteLessonAsync(id, lecturerId);
+
+            if (!result.Succeeded)
             {
-                var lessonInfo = await _context.Lessons
-                    .AsNoTracking()
-                    .Where(l => l.LessonId == id)
-                    .Select(l => new
-                    {
-                        l.LessonId,
-                        LecturerId = l.Course != null ? l.Course.LecturerId : null
-                    })
-                    .FirstOrDefaultAsync();
+                var message = result.Errors?.FirstOrDefault() ?? "Đã xảy ra lỗi.";
 
-                if (lessonInfo == null)
-                {
-                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài học." }));
-                }
-                if (lessonInfo.LecturerId != lecturerId)
-                {
-                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xóa bài học này." }));
-                }
+                if (message.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
+                    return NotFound(Result<object>.Failure(new[] { message }));
 
-                var affectedRows = await _context.Lessons
-                    .Where(l => l.LessonId == id)
-                    .ExecuteDeleteAsync();
+                if (message.Contains("không có quyền", StringComparison.OrdinalIgnoreCase))
+                    return StatusCode(403, Result<object>.Failure(new[] { message }));
 
-                if (affectedRows > 0)
-                {
-                    return Ok(Result<string>.Success("Xóa bài học thành công!"));
-                }
-                else
-                {
-                    return StatusCode(500, Result<object>.Failure(new[] { "Xóa bài học thất bại." }));
-                }
+                return StatusCode(500, Result<object>.Failure(new[] { message }));
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
-            }
+
+            return Ok(result);
         }
+
+
 
         public record CreateLessonRequest(int CourseId, string Title);
         public record UpdateLessonRequest(string Title);

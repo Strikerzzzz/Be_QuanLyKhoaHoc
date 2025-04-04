@@ -9,6 +9,7 @@ using Be_QuanLyKhoaHoc.Enums;
 using Be_QuanLyKhoaHoc.DTO;
 using static Be_QuanLyKhoaHoc.Controllers.AssignmentsController;
 using System.Linq;
+using Be_QuanLyKhoaHoc.Services;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -17,10 +18,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
     public class ExamsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly DeleteService _deleteService;
 
-        public ExamsController(ApplicationDbContext context)
+        public ExamsController(ApplicationDbContext context, DeleteService deleteService)
         {
             _context = context;
+            _deleteService = deleteService;
         }
 
         [HttpGet("course/{courseId}")]
@@ -276,7 +279,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
         [ProducesResponseType(typeof(Result<object>), 403)]
         [ProducesResponseType(typeof(Result<object>), 500)]
         [ProducesResponseType(typeof(Result<object>), 401)]
-
         public async Task<IActionResult> DeleteExam(int id)
         {
             var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -285,46 +287,24 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
             }
 
-            try
+            var result = await _deleteService.DeleteExamAsync(id, lecturerId);
+
+            if (!result.Succeeded)
             {
-                var examInfo = await _context.Exams
-                    .AsNoTracking()
-                    .Where(e => e.ExamId == id)
-                    .Select(e => new
-                    {
-                        e.ExamId,
-                        CourseLecturerId = e.Course != null ? e.Course.LecturerId : null
-                    })
-                    .FirstOrDefaultAsync();
+                var message = result.Errors?.FirstOrDefault() ?? "Đã xảy ra lỗi.";
 
-                if (examInfo == null)
-                {
-                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài kiểm tra." }));
-                }
+                if (message.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
+                    return NotFound(Result<object>.Failure(new[] { message }));
 
-                if (examInfo.CourseLecturerId == null || examInfo.CourseLecturerId != lecturerId)
-                {
-                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xóa bài kiểm tra này." }));
-                }
+                if (message.Contains("không có quyền", StringComparison.OrdinalIgnoreCase))
+                    return StatusCode(403, Result<object>.Failure(new[] { message }));
 
-                var affectedRows = await _context.Exams
-                    .Where(e => e.ExamId == id)
-                    .ExecuteDeleteAsync();
-
-                if (affectedRows > 0)
-                {
-                    return Ok(Result<string>.Success("Xóa bài kiểm tra thành công!"));
-                }
-                else
-                {
-                    return StatusCode(500, Result<object>.Failure(new[] { "Xóa bài kiểm tra thất bại." }));
-                }
+                return StatusCode(500, Result<object>.Failure(new[] { message }));
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
-            }
+
+            return Ok(result);
         }
+
 
         public record CreateExamRequest(int CourseId, string Title, string? Description, int RandomMultipleChoiceCount);
         public record UpdateExamRequest(string Title, string? Description, int RandomMultipleChoiceCount);

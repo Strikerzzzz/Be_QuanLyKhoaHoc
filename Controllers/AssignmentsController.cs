@@ -8,6 +8,7 @@ using Be_QuanLyKhoaHoc.Identity;
 using Be_QuanLyKhoaHoc.Enums;
 using System.Linq;
 using Be_QuanLyKhoaHoc.DTO;
+using Be_QuanLyKhoaHoc.Services;
 
 namespace Be_QuanLyKhoaHoc.Controllers
 {
@@ -16,10 +17,12 @@ namespace Be_QuanLyKhoaHoc.Controllers
     public class AssignmentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly DeleteService _deleteService;
 
-        public AssignmentsController(ApplicationDbContext context)
+        public AssignmentsController(ApplicationDbContext context,DeleteService deleteService)
         {
             _context = context;
+            _deleteService = deleteService;
         }
 
         [HttpGet("lesson/{lessonId}")]
@@ -298,47 +301,28 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 return Unauthorized(Result<object>.Failure(new[] { "Thông tin giảng viên không hợp lệ." }));
             }
 
-            try
+            var result = await _deleteService.DeleteAssignmentAsync(id, lecturerId);
+
+            if (!result.Succeeded)
             {
-                var assignmentInfo = await _context.Assignments
-                    .AsNoTracking()
-                    .Where(a => a.AssignmentId == id)
-                    .Select(a => new
-                    {
-                        a.AssignmentId,
-                        LecturerId = a.Lesson != null && a.Lesson.Course != null ? a.Lesson.Course.LecturerId : null
-                    })
-                    .FirstOrDefaultAsync();
+                var message = result.Errors?.FirstOrDefault() ?? "Đã xảy ra lỗi.";
 
-                if (assignmentInfo == null)
+                // Mapping lỗi từ message => status code
+                if (message.Contains("không tìm thấy", StringComparison.OrdinalIgnoreCase))
                 {
-                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy bài tập." }));
+                    return NotFound(Result<object>.Failure(new[] { message }));
                 }
 
-                if (assignmentInfo.LecturerId == null || assignmentInfo.LecturerId != lecturerId)
+                if (message.Contains("không có quyền", StringComparison.OrdinalIgnoreCase))
                 {
-                    return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xóa bài tập này." }));
+                    return StatusCode(403, Result<object>.Failure(new[] { message }));
                 }
 
-                var affectedRows = await _context.Assignments
-                    .Where(a => a.AssignmentId == id)
-                    .ExecuteDeleteAsync();
-
-                if (affectedRows > 0)
-                {
-                    return Ok(Result<string>.Success("Xóa bài tập thành công!"));
-                }
-                else
-                {
-                    return StatusCode(500, Result<object>.Failure(new[] { "Xóa bài tập thất bại." }));
-                }
+                return StatusCode(500, Result<object>.Failure(new[] { message }));
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
-            }
+
+            return Ok(result);
         }
-
 
 
         [HttpPost("{assignmentId}/submit")]

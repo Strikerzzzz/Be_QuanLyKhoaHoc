@@ -16,11 +16,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
         private readonly ApplicationDbContext _context;
         private readonly S3Service _s3Service;
         private readonly CloudFrontService _cloudFrontService;
-        public LessonContentsController(ApplicationDbContext context, S3Service s3Service, CloudFrontService cloudFrontService)
+        private readonly DeleteService _deleteService;
+        public LessonContentsController(ApplicationDbContext context, S3Service s3Service, CloudFrontService cloudFrontService, DeleteService deleteService)
         {
             _context = context;
             _s3Service = s3Service;
             _cloudFrontService = cloudFrontService;
+            _deleteService = deleteService;
         }
         // GET: api/LessonContents/{lessonId}
         [HttpGet("{lessonId}")]
@@ -141,7 +143,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 // Xử lý xóa file media cũ nếu MediaUrl thay đổi
                 if (!string.IsNullOrEmpty(lessonContent.MediaUrl) && lessonContent.MediaUrl != request.MediaUrl)
                 {
-                    string oldObjectKey = GetObjectKey(lessonContent.MediaType, lessonContent.MediaUrl);
+                    string oldObjectKey = _deleteService.GetObjectKey(lessonContent.MediaType, lessonContent.MediaUrl);
                     if (!string.IsNullOrEmpty(oldObjectKey))
                     {
                         if (lessonContent.MediaType == "video" && oldObjectKey.EndsWith(".m3u8"))
@@ -201,41 +203,17 @@ namespace Be_QuanLyKhoaHoc.Controllers
         {
             try
             {
-                var lessonContent = await _context.LessonContents
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(lc => lc.LessonContentId == id);
+                var result = await _deleteService.DeleteLessonContentAsync(id);
 
-                if (lessonContent == null)
+                if (!result.Succeeded)
                 {
-                    return NotFound(Result<object>.Failure(new[] { "Không tìm thấy nội dung bài học." }));
+                    if (result.Errors.Contains("Không tìm thấy nội dung bài học."))
+                        return NotFound(result);
+
+                    return StatusCode(500, result);
                 }
 
-                if (!string.IsNullOrEmpty(lessonContent.MediaUrl))
-                {
-                    string objectKey = GetObjectKey(lessonContent.MediaType, lessonContent.MediaUrl);
-
-                    if (!string.IsNullOrEmpty(objectKey))
-                    {
-                        if (lessonContent.MediaType == "video" && objectKey.EndsWith(".m3u8"))
-                        {
-                            // Xóa toàn bộ thư mục chứa video HLS
-                            string directoryKey = objectKey.Substring(0, objectKey.LastIndexOf('/') + 1);
-                            await _s3Service.DeleteS3DirectoryAsync(directoryKey);
-                        }
-                        else
-                        {
-                            // Xóa object đơn lẻ (ảnh hoặc media khác)
-                            await _s3Service.DeleteS3ObjectAsync(objectKey);
-                        }
-                    }
-                }
-
-
-                // Xóa bản ghi trong database
-                _context.LessonContents.Remove(lessonContent);
-                await _context.SaveChangesAsync();
-
-                return Ok(Result<object>.Success("Xóa thành công."));
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -243,40 +221,6 @@ namespace Be_QuanLyKhoaHoc.Controllers
             }
         }
 
-
-
-        private string GetObjectKey(string mediaType, string mediaUrl)
-        {
-            if (mediaType == "image")
-            {
-                return ExtractS3ObjectKey(mediaUrl); // Trích xuất object key từ URL cho ảnh
-            }
-            else if (mediaType == "video")
-            {
-                return mediaUrl; // Dùng trực tiếp MediaUrl làm object key cho video
-            }
-            return string.Empty;
-        }
-
-        private string ExtractS3ObjectKey(string url)
-        {
-            try
-            {
-                Uri uri = new Uri(url);
-                string path = uri.AbsolutePath;
-
-                if (string.IsNullOrEmpty(path) || path == "/")
-                {
-                    return string.Empty;
-                }
-
-                return path.TrimStart('/');
-            }
-            catch (Exception)
-            {
-                return string.Empty;
-            }
-        }
 
         public record ContentDto(
            int LessonContentId,

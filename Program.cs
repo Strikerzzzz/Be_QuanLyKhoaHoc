@@ -74,6 +74,7 @@ builder.Services.AddScoped<QuestionService>();
 builder.Services.AddSingleton<S3Service>();
 builder.Services.AddScoped<VideoConverterService>();
 builder.Services.AddSingleton<CloudFrontService>();
+builder.Services.AddScoped<DeleteService>();
 
 builder.Services.AddAuthorization(options =>
 {

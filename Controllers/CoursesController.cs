@@ -18,12 +18,14 @@ namespace Be_QuanLyKhoaHoc.Controllers
         private readonly ApplicationDbContext _context;
         private readonly S3Service _s3Service;
         private readonly CloudFrontService _cloudFrontService;
+        private readonly DeleteService _deleteService;
 
-        public CoursesController(ApplicationDbContext context, S3Service s3Service, CloudFrontService cloudFrontService)
+        public CoursesController(ApplicationDbContext context, S3Service s3Service, CloudFrontService cloudFrontService, DeleteService deleteService)
         {
             _context = context;
             _s3Service = s3Service;
             _cloudFrontService = cloudFrontService;
+            _deleteService = deleteService;
         }
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(Result<object>), 200)]
@@ -313,14 +315,13 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         // DELETE: api/Courses/{id}
         [HttpDelete("{id}")]
-        [ProducesResponseType(typeof(Result<string>), 200)] // Success message
-        [ProducesResponseType(typeof(Result<object>), 404)] // Not found
-        [ProducesResponseType(typeof(Result<object>), 401)] // Unauthorized
-        [ProducesResponseType(typeof(Result<object>), 403)] // Forbidden
-        [ProducesResponseType(typeof(Result<object>), 500)] // Internal server error
+        [ProducesResponseType(typeof(Result<string>), 200)]
+        [ProducesResponseType(typeof(Result<object>), 404)]
+        [ProducesResponseType(typeof(Result<object>), 401)]
+        [ProducesResponseType(typeof(Result<object>), 403)]
+        [ProducesResponseType(typeof(Result<object>), 500)]
         public async Task<IActionResult> DeleteCourse(int id)
         {
-            // Lấy thông tin giảng viên từ claims
             var lecturerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(lecturerId))
             {
@@ -329,17 +330,49 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
             try
             {
-                // Sử dụng FindAsync vì CourseId là khóa chính
-                var course = await _context.Courses.FindAsync(id);
+                var course = await _context.Courses
+                    .Include(c => c.Lessons)
+                    .Include(c => c.Exam)
+                    .FirstOrDefaultAsync(c => c.CourseId == id);
+
                 if (course == null)
                 {
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy khóa học." }));
                 }
+
                 if (course.LecturerId != lecturerId)
                 {
                     return StatusCode(403, Result<object>.Failure(new[] { "Bạn không có quyền xoá khóa học này." }));
                 }
 
+                // ==== 1. XÓA PROGRESS ====
+                await _context.Progresses
+                    .Where(p => p.CourseId == id)
+                    .ExecuteDeleteAsync();
+
+                // ==== 2. XÓA EXAM ====
+                var exams = await _context.Exams
+                    .Where(e => e.CourseId == id)
+                    .ToListAsync();
+
+                foreach (var exam in exams)
+                {
+                    var result = await _deleteService.DeleteExamAsync(exam.ExamId, lecturerId);
+                    if (!result.Succeeded) return StatusCode(500, Result<object>.Failure(result.Errors));
+                }
+
+                // ==== 3. XÓA LESSONS ====
+                var lessons = await _context.Lessons
+                    .Where(l => l.CourseId == id)
+                    .ToListAsync();
+
+                foreach (var lesson in lessons)
+                {
+                    var result = await _deleteService.DeleteLessonAsync(lesson.LessonId, lecturerId);
+                    if (!result.Succeeded) return StatusCode(500, Result<object>.Failure(result.Errors));
+                }
+
+                // ==== 4. XÓA FILE ẢNH TRÊN S3 (nếu có) ====
                 if (!string.IsNullOrEmpty(course.AvatarUrl))
                 {
                     string objectKey = ExtractS3ObjectKey(course.AvatarUrl);
@@ -349,14 +382,15 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     }
                 }
 
-                _context.Courses.Remove(course);
-                await _context.SaveChangesAsync();
+                // ==== 5. XÓA KHÓA HỌC ====
+                await _context.Courses
+                    .Where(p => p.CourseId == id)
+                    .ExecuteDeleteAsync();
 
-                return Ok(Result<string>.Success("Xoá khóa học thành công!"));
+                return Ok(Result<string>.Success("Xoá khóa học và tất cả dữ liệu liên quan thành công!"));
             }
             catch (Exception ex)
             {
-                // Nếu có logger, bạn có thể ghi log lỗi tại đây: _logger.LogError(ex, "Lỗi khi xoá khóa học.");
                 return StatusCode(500, Result<object>.Failure(new[] { $"Có lỗi xảy ra: {ex.Message}" }));
             }
         }
