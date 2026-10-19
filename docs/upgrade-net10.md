@@ -21,7 +21,8 @@ October 2026. .NET 8 and .NET 9 reach end of support on November 10, 2026. .NET 
 4. **Removed `Microsoft.VisualStudio.Web.CodeGeneration.Design`.** It is only used for Visual Studio scaffolding, and even its latest version pulls in `NuGet.Packaging`/`NuGet.Protocol` 6.12.1, which have a known vulnerability. Add it back temporarily when scaffolding is needed.
 5. **Pinned `System.Security.Cryptography.Pkcs` 10.0.13.** `Microsoft.Data.SqlClient` 6.1.7 brings in 9.0.11, which is affected by CVE-2026-84008.
 6. **Swagger:** Swashbuckle 10 is built on Microsoft.OpenApi 2.x. The model namespace changed, and the security requirement now references the scheme through `OpenApiSecuritySchemeReference` inside a document-aware callback.
-7. **EF Core seed fix.** The admin seed used `PasswordHasher` (random salt), a new `ConcurrencyStamp` and `CreatedAt = DateTime.UtcNow`, so the model changed on every build. EF Core 9 and later report this as `PendingModelChangesWarning` and stop `dotnet ef database update`. The seed now uses the fixed values already stored in the last migration, so no new migration is needed and existing databases are not affected.
+7. **OpenAPI output fix.** Swashbuckle 10 writes `[Range(0, double.MaxValue)]` on `Course.Price` as `"maximum": 1.7976931348623157E+308`. NSwag cannot parse that number, so the frontend client could not be generated. A small schema filter drops this meaningless upper bound, as Swashbuckle 7 did. Server-side validation is unchanged.
+8. **EF Core seed fix.** The admin seed used `PasswordHasher` (random salt), a new `ConcurrencyStamp` and `CreatedAt = DateTime.UtcNow`, so the model changed on every build. EF Core 9 and later report this as `PendingModelChangesWarning` and stop `dotnet ef database update`. The seed now uses the fixed values already stored in the last migration, so no new migration is needed and existing databases are not affected.
 
 ## Verification
 
@@ -35,7 +36,8 @@ October 2026. .NET 8 and .NET 9 reach end of support on November 10, 2026. .NET 
   - create course, public course list, search, lecturer's courses, course by id, course details.
 
   Status codes and response bodies were identical, ignoring tokens, IDs and timestamps.
-- OpenAPI: all 63 operations and 74 schemas match. The only difference is that `ObjectResult.data` no longer has `nullable: true`, because Swashbuckle 10 writes an untyped `object` without it. The frontend's generated TypeScript client already types this field as `any`, so the frontend needs no change.
+- OpenAPI: compared operations, parameters, request and response bodies, schemas and validation keywords. All 63 operations and 74 schemas match. The only remaining difference is that `ObjectResult.data` no longer has `nullable: true`, because Swashbuckle 10 writes an untyped `object` without it. The generated TypeScript client types this field as `any`, so it makes no difference to the frontend.
+- Frontend client: regenerating with the same NSwag version (14.2.0) from the .NET 8 document reproduced the committed `api-client.ts` exactly. From the new document, only the user types changed (see below). The frontend builds with the new client.
 
 ## Security fix found during testing
 

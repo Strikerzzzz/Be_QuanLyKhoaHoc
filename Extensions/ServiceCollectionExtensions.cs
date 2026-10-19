@@ -13,6 +13,8 @@ namespace Be_QuanLyKhoaHoc.Extensions
             {
                 //o.CustomSchemaIds(id => id.FullName!.Replace('+', '-'));
 
+                o.SchemaFilter<UnboundedMaximumSchemaFilter>();
+
                 var securityScheme = new OpenApiSecurityScheme
                 {
                     Name = "Authorization",
