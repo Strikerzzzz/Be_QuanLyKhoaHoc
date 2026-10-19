@@ -1,7 +1,8 @@
 # StackMind — E-Learning Platform (Backend)
 
 REST API for **StackMind**, an online learning platform with video lessons, exams and progress tracking.
-Built with ASP.NET Core 8 as a team graduation project at UNETI (2025, graded 9.4/10). I was the team lead and main developer.
+Built as a team graduation project at UNETI (2025, graded 9.4/10). I was the team lead and main developer.
+Originally written for .NET 8; upgraded to .NET 10 LTS in October 2026 ([upgrade notes](docs/upgrade-net10.md)).
 
 Frontend (Angular 19): [Fe_QuanLyKhoaHoc](https://github.com/Strikerzzzz/Fe_QuanLyKhoaHoc)
 
@@ -35,7 +36,7 @@ Images skip the server: the API issues an S3 pre-signed URL and the browser uplo
 
 ## Tech stack
 
-ASP.NET Core 8 · Entity Framework Core · SQL Server · ASP.NET Core Identity · JWT + refresh tokens · AWS S3 · Amazon CloudFront signed URLs · FFmpeg · Swagger · Docker
+ASP.NET Core 10 · Entity Framework Core 10 · SQL Server · ASP.NET Core Identity · JWT + refresh tokens · AWS S3 · Amazon CloudFront signed URLs · FFmpeg · Swagger · Docker
 
 ## Project structure
 
@@ -50,7 +51,7 @@ ASP.NET Core 8 · Entity Framework Core · SQL Server · ASP.NET Core Identity �
 
 ## Getting started
 
-Requirements: .NET 8 SDK, SQL Server, FFmpeg on `PATH`, an S3 bucket behind a CloudFront distribution, and an SMTP account.
+Requirements: .NET 10 SDK, SQL Server, FFmpeg on `PATH`, an S3 bucket behind a CloudFront distribution, and an SMTP account.
 
 1. Set `ConnectionStrings:DefaultConnection` in `appsettings.Development.json`, and fill the non-secret values in `appsettings.json` (`AWS:BucketName`, `AWS:Region`, `CloudFront:Domain`, `Email:SmtpHost`, `Email:SmtpUser`).
 2. Keep secrets out of the repository with user-secrets:
