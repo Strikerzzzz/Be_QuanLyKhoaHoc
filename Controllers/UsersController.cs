@@ -1,4 +1,5 @@
-﻿using Be_QuanLyKhoaHoc.Identity.Entities;
+﻿using Be_QuanLyKhoaHoc.DTO;
+using Be_QuanLyKhoaHoc.Identity.Entities;
 using Be_QuanLyKhoaHoc.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -43,7 +44,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         public record ConfirmEmailRequest(string Email, string Token);
         public record RefreshTokenRequest(string RefreshToken);
         public record RefreshTokenResponse(string AccessToken, string RefreshToken);
-        public record UserPagedResult(IEnumerable<User> Users, int TotalCount);
+        public record UserPagedResult(IEnumerable<UserDto> Users, int TotalCount);
         public record UpdateUserProfileRequest(
         string? PhoneNumber,
         string? FullName,
@@ -230,7 +231,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
                 }
 
-                var result = new UserPagedResult(users, totalCount);
+                var result = new UserPagedResult(users.Select(UserDto.FromEntity), totalCount);
 
                 return Ok(Result<UserPagedResult>.Success(result));
             }
@@ -518,7 +519,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
 
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [HttpGet("profile")]
-        [ProducesResponseType(typeof(Result<User>), 200)]
+        [ProducesResponseType(typeof(Result<UserDto>), 200)]
         [ProducesResponseType(typeof(object), 400)]
         [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(Result<object>), 404)]
@@ -541,7 +542,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                     return NotFound(Result<object>.Failure(new[] { "Không tìm thấy người dùng." }));
                 }
 
-                return Ok(Result<User>.Success(user));
+                return Ok(Result<UserDto>.Success(UserDto.FromEntity(user)));
             }
             catch (Exception ex)
             {
@@ -550,7 +551,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
         }
         [Authorize(AuthenticationSchemes = "Bearer", Roles = "User")]
         [HttpPut("profile")]
-        [ProducesResponseType(typeof(Result<User>), 200)]
+        [ProducesResponseType(typeof(Result<UserDto>), 200)]
         [ProducesResponseType(typeof(object), 400)]
         [ProducesResponseType(typeof(object), 401)]
         [ProducesResponseType(typeof(Result<object>), 404)]
@@ -588,7 +589,7 @@ namespace Be_QuanLyKhoaHoc.Controllers
                 // Lưu thay đổi vào database
                 await _context.SaveChangesAsync();
 
-                return Ok(Result<User>.Success(user));
+                return Ok(Result<UserDto>.Success(UserDto.FromEntity(user)));
             }
             catch (Exception ex)
             {

@@ -37,6 +37,10 @@ October 2026. .NET 8 and .NET 9 reach end of support on November 10, 2026. .NET 
   Status codes and response bodies were identical, ignoring tokens, IDs and timestamps.
 - OpenAPI: all 63 operations and 74 schemas match. The only difference is that `ObjectResult.data` no longer has `nullable: true`, because Swashbuckle 10 writes an untyped `object` without it. The frontend's generated TypeScript client already types this field as `any`, so the frontend needs no change.
 
+## Security fix found during testing
+
+While comparing responses, I found that `GET /api/Users`, `GET /api/Users/profile` and `PUT /api/Users/profile` returned the full Identity user entity, including `passwordHash`, `securityStamp` and `concurrencyStamp`. They now return `UserDto`, which has only the 9 fields the frontend uses. This changes the API schema (`UserResult` becomes `UserDtoResult`), so the frontend's API client was regenerated in the same release.
+
 ## Not covered by these checks
 
 - Video upload → FFmpeg → HLS → S3, image upload through pre-signed URLs, and CloudFront signed URLs (these need AWS access).
@@ -46,6 +50,5 @@ October 2026. .NET 8 and .NET 9 reach end of support on November 10, 2026. .NET 
 
 ## Follow-ups
 
-- Return DTOs instead of Identity entities from the user endpoints.
 - Upgrade to AWS SDK for .NET v4 as a separate change; it has breaking changes and needs testing against S3.
 - Clean up the 31 nullable reference warnings.
