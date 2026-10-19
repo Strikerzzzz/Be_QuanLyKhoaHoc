@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -25,22 +25,10 @@ namespace Be_QuanLyKhoaHoc.Extensions
 
                 o.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, securityScheme);
 
-                var securityRequirement = new OpenApiSecurityRequirement
+                o.AddSecurityRequirement(document => new OpenApiSecurityRequirement
                 {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = JwtBearerDefaults.AuthenticationScheme
-                            }
-                        },
-                        new string[] {}
-                    }
-                };
-
-                o.AddSecurityRequirement(securityRequirement);
+                    [new OpenApiSecuritySchemeReference(JwtBearerDefaults.AuthenticationScheme, document)] = []
+                });
             });
             return services;
         }
